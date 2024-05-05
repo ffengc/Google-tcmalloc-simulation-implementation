@@ -12,7 +12,7 @@ static const size_t BUCKETS_NUM = 208; // 一共208个桶
 // 管理切分好的小对象的自由链表
 class free_list {
 private:
-    void* __free_list_ptr;
+    void* __free_list_ptr = nullptr;
 
 public:
     void push(void* obj) {
@@ -24,6 +24,7 @@ public:
         assert(__free_list_ptr);
         void* obj = __free_list_ptr;
         __free_list_ptr = __next_obj(obj);
+        return obj;
     }
     bool empty() { return __free_list_ptr == nullptr; }
 

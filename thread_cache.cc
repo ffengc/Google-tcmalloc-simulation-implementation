@@ -15,4 +15,12 @@ void* thread_cache::allocate(size_t size) {
 }
 
 void thread_cache::deallocate(void* ptr, size_t size) {
+    assert(ptr);
+    assert(size <= MAX_BYTES);
+    size_t index = size_class::bucket_index(size);
+    __free_lists[index].push(ptr);
+}
+
+void* thread_cache::fetch_from_central_cache(size_t index, size_t size) {
+    return nullptr;
 }

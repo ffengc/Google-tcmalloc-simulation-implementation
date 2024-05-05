@@ -17,4 +17,6 @@ public:
     void* fetch_from_central_cache(size_t index, size_t size);
 };
 
+static __thread thread_cache* p_tls_thread_cache = nullptr;
+
 #endif

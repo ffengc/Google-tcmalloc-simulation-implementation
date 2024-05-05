@@ -8,6 +8,8 @@
   - [threadCache整体框架](#threadcache整体框架)
   - [开始写threadCache代码](#开始写threadcache代码)
   - [哈系桶的映射规则](#哈系桶的映射规则)
+  - [threadCache的tls无锁访问](#threadcache的tls无锁访问)
+  - [写tcfree的时候的一个遗留问题](#写tcfree的时候的一个遗留问题)
 
 ***
 
@@ -240,3 +242,67 @@ void* thread_cache::allocate(size_t size) {
     }
 }
 ```
+
+## threadCache的tls无锁访问
+
+首先，如果我们了解过操作系统相关知识，我们就知道，进程里面（包括线程）这些，都是共享的。也就是说，如果我们不加处理，我们创建的threadCache是所有线程都能访问的。
+
+这个不是我们想要的，我们需要的是，每一个线程都有自己的threadCache!
+
+> 线程局部存储（TLS），是一种变量的存储方法，这个变量在它所在的线程内是全局可访问的，但是不能被其他线程访问到，这样就保持了数据的线程独立性。而熟知的全局变量，是所有线程都可以访问的，这样就不可避免需要锁来控制，增加了控制成本和代码复杂度。
+
+
+然后linux下这样操作就行了。
+
+thread_cache.hpp
+```cpp
+__thread thread_cache* p_tls_thread_cache = nullptr;
+```
+
+windows下这样写
+
+```cpp
+__thread static thread_cache* p_tls_thread_cache = nullptr;
+```
+
+这个也很好理解了，这样声明这个变量之后，这个p_tls_thread_cache变量就会每个线程独享一份。
+
+然后我们调用的时候，也不可能让别人直接去调用thread_cache.cc里面的alloc，所以，我们再弄一个文件，提供一个调用的接口。
+
+tcmalloc.hpp
+```cpp
+static void* tcmalloc(size_t size) {
+    if (p_tls_thread_cache == nullptr)
+        // 相当于单例
+        p_tls_thread_cache = new thread_cache;
+    return p_tls_thread_cache->allocate(size);
+}
+
+static void tcfree(size_t size) {
+}
+#endif
+```
+
+## 写tcfree的时候的一个遗留问题
+
+tcmalloc.hpp
+```cpp
+static void tcfree(void* ptr, size_t size) {
+    assert(p_tls_thread_cache);
+    p_tls_thread_cache->deallocate(ptr, size);
+}
+```
+
+thread_cache.cc
+```cpp
+void thread_cache::deallocate(void* ptr, size_t size) {
+    assert(ptr);
+    assert(size <= MAX_BYTES);
+    size_t index = size_class::bucket_index(size);
+    __free_lists[index].push(ptr);
+}
+```
+
+我这里是要传大小的，但是呢，p_tls_thread_cache->deallocate()需要给size，不然不知道还到哪一个桶上。但是我们的free是不用传size的，这里如何解决？
+
+目前解决不了，先保留这个问题，留到后面再解决。
