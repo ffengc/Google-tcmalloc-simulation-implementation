@@ -3,7 +3,7 @@
 #ifndef __YUFC_THREAD_CACHE_HPP__
 #define __YUFC_THREAD_CACHE_HPP__
 
-#include "common.hpp"
+#include "../common.hpp"
 
 class thread_cache {
 private:

@@ -3,22 +3,34 @@
 #ifndef __YUFC_COMM_HPP__
 #define __YUFC_COMM_HPP__
 
+#include <algorithm>
 #include <assert.h>
-#include <iostream>
+#include <mutex>
 
 static const size_t MAX_BYTES = 256 * 1024; // 256kb
 static const size_t BUCKETS_NUM = 208; // 一共208个桶
+
+#if defined(_WIN64) || defined(__x86_64__) || defined(__ppc64__) || defined(__aarch64__)
+typedef unsigned long long PAGE_ID;
+#else
+typedef size_t PAGE_ID;
+#endif
 
 // 管理切分好的小对象的自由链表
 class free_list {
 private:
     void* __free_list_ptr = nullptr;
+    size_t __max_size = 1;
 
 public:
     void push(void* obj) {
         assert(obj);
         __next_obj(obj) = __free_list_ptr;
         __free_list_ptr = obj;
+    }
+    void push(void* start, void* end) {
+        __next_obj(end) = __free_list_ptr;
+        __free_list_ptr = start;
     }
     void* pop() {
         assert(__free_list_ptr);
@@ -27,8 +39,9 @@ public:
         return obj;
     }
     bool empty() { return __free_list_ptr == nullptr; }
+    size_t& max_size() { return __max_size; }
 
-private:
+public:
     static void*& __next_obj(void* obj) {
         return *(void**)obj;
     }
@@ -88,6 +101,65 @@ public:
         }
         return -1;
     }
+    // 一次threadCache从centralCache获取多少个内存
+    static inline size_t num_move_size(size_t size) {
+        if (size == 0)
+            return 0;
+        // [2, 512], 一次批量移动多少个对象的（慢启动）上限制
+        // 小对象一次批量上限高
+        // 大对象一次批量上限低
+        int num = MAX_BYTES / size;
+        if (num < 2)
+            num = 2;
+        if (num > 512)
+            num = 512;
+        return num;
+    }
 };
 
+// 管理大块内存
+class span {
+public:
+    PAGE_ID __page_id; // 大块内存起始页的页号
+    size_t __n = 0; // 页的数量
+    // 双向链表结构
+    span* __next = nullptr;
+    span* __prev = nullptr;
+    size_t __use_count = 0; // 切成段小块内存，被分配给threadCache的计数器
+    void* __free_list = nullptr; // 切好的小块内存的自由链表
+};
+
+// 带头双向循环链表
+class span_list {
+private:
+    span* __head = nullptr;
+
+public:
+    std::mutex __bucket_mtx;
+
+public:
+    span_list() {
+        __head = new span;
+        __head->__next = __head;
+        __head->__prev = __head;
+    }
+    void insert(span* pos, span* new_span) {
+        // 插入的是一个完好的span
+        assert(pos);
+        assert(new_span);
+        span* prev = pos->__prev;
+        prev->__next = new_span;
+        new_span->__prev = prev;
+        new_span->__next = pos;
+        pos->__prev = new_span;
+    }
+    void erase(span* pos) {
+        assert(pos);
+        assert(pos != __head);
+        span* prev = pos->__prev;
+        span* next = pos->__next;
+        prev->__next = next;
+        next->__prev = prev;
+    }
+};
 #endif

@@ -10,6 +10,10 @@
   - [哈系桶的映射规则](#哈系桶的映射规则)
   - [threadCache的tls无锁访问](#threadcache的tls无锁访问)
   - [写tcfree的时候的一个遗留问题](#写tcfree的时候的一个遗留问题)
+  - [central\_cache整体结构](#central_cache整体结构)
+  - [central\_cache的核心逻辑](#central_cache的核心逻辑)
+  - [central\_cache里面fetch\_range\_obj的逻辑](#central_cache里面fetch_range_obj的逻辑)
+  - [page\_cache整体框架](#page_cache整体框架)
 
 ***
 
@@ -306,3 +310,287 @@ void thread_cache::deallocate(void* ptr, size_t size) {
 我这里是要传大小的，但是呢，p_tls_thread_cache->deallocate()需要给size，不然不知道还到哪一个桶上。但是我们的free是不用传size的，这里如何解决？
 
 目前解决不了，先保留这个问题，留到后面再解决。
+
+## central_cache整体结构
+
+centralCache也是一个哈希桶结构，他的哈希桶的映射关系跟threadCache是一样的。不同的是他的每个哈希桶位置挂是SpanList链表结构，不过每个映射桶下面的span中的大内存块被按映射关系切成了一个个小内存块对象挂在span的自由链表中。
+
+这里是需要加锁的，但是是桶锁。如果不同线程获取不同的桶的东西，就不用加锁。
+
+![](./assets/3.png)
+
+**申请内存:**
+1. 当thread cache中没有内存时，就会批量向central cache申请一些内存对象，这里的批量获取对 象的数量使用了类似网络tcp协议拥塞控制的慢开始算法;central cache也有一个哈希映射的 spanlist，spanlist中挂着span，从span中取出对象给thread cache，这个过程是需要加锁的，不 过这里使用的是一个桶锁，尽可能提高效率。
+2. central cache映射的spanlist中所有span的都没有内存以后，则需要向page cache申请一个新的 span对象，拿到span以后将span管理的内存按大小切好作为自由链表链接到一起。然后从span 中取对象给thread cache。
+3. central cache的中挂的span中use_count记录分配了多少个对象出去，分配一个对象给thread cache，就++use_count
+
+
+**释放内存:**
+
+1. 当threadCache过长或者线程销毁，则会将内存释放回centralCache中的，释放回来时--use_count。当use_count减到0时则表示所有对象都回到了span，则将span释放回pageCache，pageCache中会对前后相邻的空闲页进行合并。
+
+**centralCache里面的小对象是由大对象切出来的，大对象就是Span。**
+
+span的链表是双向链表。
+
+span除了central_cache要用，后面的page_cache也要用，所以定义到common里面去吧。
+
+然后这里存在一个问题，就是这个size_t，在64位下不够了，需要条件编译处理一下。
+
+common.hpp
+```cpp
+#if defined(_WIN64) || defined(__x86_64__) || defined(__ppc64__) || defined(__aarch64__)
+typedef unsigned long long PAGE_ID;
+#else
+typedef size_t PAGE_ID;
+#endif
+```
+
+这里如果在windows下有个坑，win64下是既有win64也有win32的定义的，所以要先判断64的，避免出bug。
+
+```cpp
+// 管理大块内存
+class span {
+public:
+    PAGE_ID __page_id; // 大块内存起始页的页号
+    size_t __n; // 页的数量
+    // 双向链表结构
+    span* __next;
+    span* __prev;
+    size_t __use_count; // 切成段小块内存，被分配给threadCache的计数器
+    void* __free_list; // 切好的小块内存的自由链表
+};
+```
+
+然后就要手撕一个双链表了，十分简单，不多说了。这里面，每一个桶要维护一个锁！
+
+common.hpp
+```cpp
+// 带头双向循环链表
+class span_list {
+private:
+    span* __head = nullptr;
+    std::mutex __bucket_mtx;
+public:
+    span_list() {
+        __head = new span;
+        __head->__next = __head;
+        __head->__prev = __head;
+    }
+    void insert(span* pos, span* new_span) {
+        // 插入的是一个完好的span
+        assert(pos);
+        assert(new_span);
+        span* prev = pos->__prev;
+        prev->__next = new_span;
+        new_span->__prev = prev;
+        new_span->__next = pos;
+        pos->__prev = new_span;
+    }
+    void erase(span* pos) {
+        assert(pos);
+        assert(pos != __head);
+        span* prev = pos->__prev;
+        span* next = pos->__next;
+        prev->__next = next;
+        next->__prev = prev;
+    }
+};
+```
+
+central_cache.hpp
+```cpp
+#include "../common.hpp"
+
+class central_cache {
+private:
+    span_list __span_lists[BUCKETS_NUM]; // 有多少个桶就多少个
+public:
+    
+};
+```
+
+有多少个桶就有多少把锁！
+
+
+## central_cache的核心逻辑
+
+**很明显这里是比较适合使用单例模式的。因为每个进程只需要维护一个central_cache。单例模式的详细说明可以见我的博客: [单例模式](https://blog.csdn.net/Yu_Cblog/article/details/131787131)**
+
+
+然后这里我们用饿汉模式。
+
+```cpp
+class central_cache {
+private:
+    span_list __span_lists[BUCKETS_NUM]; // 有多少个桶就多少个
+private:
+    static central_cache __s_inst;
+    central_cache() = default; // 构造函数私有
+    central_cache(const central_cache&) = delete; // 不允许拷贝
+public:
+    central_cache* get_instance() { return &__s_inst; }
+public:
+};
+```
+
+
+然后threadCache找你要内存了，你给多少呢？
+
+这里用了一个类似tcp的慢开始的反馈算法。我们可以把这个算法写到size_class里面去。
+
+common.hpp::size_class
+```cpp
+    // 一次threadCache从centralCache获取多少个内存
+    static inline size_t num_move_size(size_t size) {
+        if (size == 0)
+            return 0;
+        // [2, 512], 一次批量移动多少个对象的（慢启动）上限制
+        // 小对象一次批量上限高
+        // 大对象一次批量上限低
+        int num = MAX_BYTES / size;
+        if (num < 2)
+            num = 2;
+        if (num > 512)
+            num = 512;
+        return num;
+    }
+```
+
+用这个方法，可以告诉threadCache，本次要从centralCache获取多少内存。
+
+然后为了控制慢开始，在free_list里面还需要控制一个max_size，然后这个字段递增，就能控制慢启动了。
+
+thread_cache.cc
+```cpp
+void* thread_cache::fetch_from_central_cache(size_t index, size_t size) {
+    // 慢开始反馈调节算法
+    size_t batch_num = std::min(__free_lists[index].max_size(), size_class::num_move_size(size));
+    if (__free_lists[index].max_size() == batch_num)
+        __free_lists[index].max_size() += 1; // 最多增长到512了
+    // 1. 最开始一次向centralCache要太多，因为太多了可能用不完
+    // 2. 如果你一直有这个桶size大小的内存，那么后面我可以给你越来越多，直到上限(size_class::num_move_size(size))
+    //      这个上限是根据这个桶的内存块大小size来决定的
+    // 3. size越大，一次向centralcache要的就越小，如果size越小，相反。
+    return nullptr;
+}
+```
+
+
+然后去调用这个fetch_range_obj函数。
+
+参数的意义：获取一段内存，从start到end个块，一共获取batch_num个，然后每一个块的大小是size，end-start应该等于batch_num。
+
+返回值的意义：这里向central_cache中的span获取batch_num个，那么这个span一定有这么多个吗？不一定。span下如果不够，就全部给你。actual_n表示实际获取到了多少个。 1 <= actual_n <= batch_num。
+
+
+
+thread_cache.cc
+```cpp
+void* thread_cache::fetch_from_central_cache(size_t index, size_t size) {
+    // 慢开始反馈调节算法
+    size_t batch_num = std::min(__free_lists[index].max_size(), size_class::num_move_size(size));
+    if (__free_lists[index].max_size() == batch_num)
+        __free_lists[index].max_size() += 1; // 最多增长到512了
+    // 1. 最开始一次向centralCache要太多，因为太多了可能用不完
+    // 2. 如果你一直有这个桶size大小的内存，那么后面我可以给你越来越多，直到上限(size_class::num_move_size(size))
+    //      这个上限是根据这个桶的内存块大小size来决定的
+    // 3. size越大，一次向centralcache要的就越小，如果size越小，相反。
+
+    // 开始获取内存了
+    void* start = nullptr;
+    void* end = nullptr;
+    size_t actual_n = central_cache::get_instance()->fetch_range_obj(start, end, batch_num, size);
+    return nullptr;
+}
+```
+
+然后我们获取到从cc(centralCache)里面的内存了，这里分两种情况：
+
+1. cc只给了tc一个内存块(actual_n==1时), 此时直接返回就行了。此时thread_cache::allocate会直接把获取到的这一块交给用户，不用经过tc的哈希桶了。
+2. 但是如果cc给我们的是一段(actual_n>=1)，只需要给用户其中一块，其他的要插入到tc里面去！所以我们要给free_list提供一个插入一段（好几块size大小内存）的方法，也是头插就行了。
+
+可以重载一下。
+
+common.hpp::free_list
+```cpp
+    void push(void* obj) {
+        assert(obj);
+        __next_obj(obj) = __free_list_ptr;
+        __free_list_ptr = obj;
+    }
+    void push(void* start, void* end) {
+        __next_obj(end) = __free_list_ptr;
+        __free_list_ptr = start;
+    }
+```
+
+thread_cache.cc
+```cpp
+    if (actual_n == 1) {
+        assert(start == end);
+        return start;
+    } else {
+        __free_lists[index].push(free_list::__next_obj(start), end);
+        return start;
+    }
+
+```
+
+这里push的是start的下一个位置，start就不用经过tc了，start直接返回给用户，然后start+1到end位置的，插入到tc里面去。
+
+## central_cache里面fetch_range_obj的逻辑
+
+```cpp
+size_t central_cache::fetch_range_obj(void*& start, void*& end, size_t batch_num, size_t size) {
+    size_t index = size_class::bucket_index(size); // 算出在哪个桶找
+    
+}
+```
+
+算出在哪桶里面找之后，就要分情况了。
+
+首先，如果这个桶里面一个span都没挂，那就要找下一层了，找pc要。
+
+如果有挂一些span，也要分情况。
+
+我们要先找到一个非空的span。
+
+所以写一个方法，不过这个方法可以后面再实现。
+
+然后这里要注意一下。自由链表是单链表，如果我们取一段出来，最后要记得链表末尾给一个nullptr。
+
+**注意细节：**
+1. 取batch_num个，end指针只需要走batch_num步（前提是span下面够这么多）！
+2. 如果span下面不够，要特殊处理！
+
+
+```cpp
+size_t central_cache::fetch_range_obj(void*& start, void*& end, size_t batch_num, size_t size) {
+    size_t index = size_class::bucket_index(size); // 算出在哪个桶找
+    __span_lists[index].__bucket_mtx.lock(); // 加锁（可以考虑RAII）
+    span* cur_span = get_non_empty_span(__span_lists[index], size); // 找一个非空的span（有可能找不到）
+    assert(cur_span);
+    assert(cur_span->__free_list); // 这个非空的span一定下面挂着内存了，所以断言一下
+
+    start = cur_span->__free_list;
+    // 这里要画图理解一下
+    end = start;
+    // 开始指针遍历，从span中获取对象，如果不够，有多少拿多少
+    size_t i = 0;
+    size_t actual_n = 1;
+    while (i < batch_num - 1 && free_list::__next_obj(end) != nullptr) {
+        end = free_list::__next_obj(end);
+        ++i;
+        ++actual_n;
+    }
+    cur_span->__free_list = free_list::__next_obj(end);
+    free_list::__next_obj(end) = nullptr;
+    __span_lists[index].__bucket_mtx.unlock(); // 解锁
+    return actual_n;
+}
+```
+
+当然cc到这里还没有完全写完的，但是我们要继续先写pc，才能来完善这里的部分。
+
+## page_cache整体框架

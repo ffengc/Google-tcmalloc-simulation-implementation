@@ -2,6 +2,7 @@
 
 #include "tcmalloc.hpp"
 #include <thread>
+#include <iostream>
 
 void alloc1() {
     for (size_t i = 0; i < 5; i++) {
