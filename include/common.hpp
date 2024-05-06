@@ -7,6 +7,14 @@
 #include <assert.h>
 #include <mutex>
 
+#if defined(_WIN32) || defined(_WIN64)
+#include <windows.h>
+#elif defined(__aarch64__) // ...
+#include <sys/mman.h>
+#else
+#include <iostream>
+#endif
+
 static const size_t MAX_BYTES = 256 * 1024; // 256kb
 static const size_t BUCKETS_NUM = 208; // 一共208个桶
 static const size_t PAGES_NUM = 129; // pageCahche设置128个桶
@@ -21,14 +29,11 @@ typedef size_t PAGE_ID;
 inline static void* system_alloc(size_t kpage) {
     void* ptr = nullptr;
 #if defined(_WIN32) || defined(_WIN64)
-#include <windows.h>
-    *ptr = VirtualAlloc(0, kpage * (1 << 12), MEM_COMMIT | MEM_RESERVE,
+    ptr = VirtualAlloc(0, kpage << 13, MEM_COMMIT | MEM_RESERVE,
         PAGE_READWRITE);
 #elif defined(__aarch64__) // ...
-#include <sys/mman.h>
-    void* ptr = mmap(NULL, kpage << 13, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    ptr = mmap(NULL, kpage << 13, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 #else
-#include <iostream>
     std::cerr << "unknown system" << std::endl;
     throw std::bad_alloc();
 #endif

@@ -1,12 +1,14 @@
 
 #include "../include/central_cache.hpp"
 #include "../include/page_cache.hpp"
+#include "../include/log.hpp"
 
 central_cache central_cache::__s_inst;
 
 size_t central_cache::fetch_range_obj(void*& start, void*& end, size_t batch_num, size_t size) {
     size_t index = size_class::bucket_index(size); // 算出在哪个桶找
     __span_lists[index].__bucket_mtx.lock(); // 加锁（可以考虑RAII）
+    LOG(DEBUG) << "central_cache::fetch_range_obj() call central_cache::get_non_empty_span()" << std::endl;
     span* cur_span = get_non_empty_span(__span_lists[index], size); // 找一个非空的span（有可能找不到）
     assert(cur_span);
     assert(cur_span->__free_list); // 这个非空的span一定下面挂着内存了，所以断言一下
@@ -37,14 +39,16 @@ span* central_cache::get_non_empty_span(span_list& list, size_t size) {
             return it;
         it = it->__next;
     }
+    LOG(DEBUG) << "central_cache::get_non_empty_span() cannot find non-null span in cc, goto pc for mem" << std::endl;
     // 这里先解开桶锁
     list.__bucket_mtx.unlock();
 
     // 如果走到这里，说明没有空闲的span了，就要找pc了
+    LOG(DEBUG) << "central_cache::get_non_empty_span() call page_cache::get_instance()->new_span()" << std::endl;
     page_cache::get_instance()->__page_mtx.lock();
     span* cur_span = page_cache::get_instance()->new_span(size_class::num_move_page(size));
     page_cache::get_instance()->__page_mtx.unlock();
-
+    LOG(DEBUG) << "central_cache::get_non_empty_span() get new span success" << std::endl;
     // 切分的逻辑
     // 1. 计算span的大块内存的起始地址和大块内存的大小（字节数）
     char* addr_start = (char*)(cur_span->__page_id << PAGE_SHIFT);
@@ -54,6 +58,7 @@ span* central_cache::get_non_empty_span(span_list& list, size_t size) {
     cur_span->__free_list = addr_start; // 先切一块下来做头
     addr_start += size;
     void* tail = cur_span->__free_list;
+    LOG(DEBUG) << "central_cache::get_non_empty_span() cut span" << std::endl;
     while(addr_start < addr_end) {
         free_list::__next_obj(tail) = addr_start;
         tail = free_list::__next_obj(tail);

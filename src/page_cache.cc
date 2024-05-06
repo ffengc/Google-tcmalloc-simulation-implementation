@@ -1,5 +1,6 @@
 
 #include "../include/page_cache.hpp"
+#include "../include/log.hpp"
 
 page_cache page_cache::__s_inst;
 
@@ -32,9 +33,11 @@ span* page_cache::new_span(size_t k) {
              */
             // 剩下的挂到相应位置
             __span_lists[n_span->__n].push_front(n_span);
+            LOG(DEBUG) << "page_cache::new_span() have span, return" << std::endl;
             return k_span;
         }
     }
+    LOG(DEBUG) << "page_cache::new_span() cannot find span, goto os for mem" << std::endl;
     // 走到这里，说明找不到span了：找os要
     span* big_span = new span;
     void* ptr = system_alloc(PAGES_NUM - 1);

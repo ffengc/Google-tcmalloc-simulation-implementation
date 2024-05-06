@@ -1,6 +1,6 @@
 
 
-#include "tcmalloc.hpp"
+#include "./include/tcmalloc.hpp"
 #include <thread>
 #include <iostream>
 
@@ -17,7 +17,11 @@ void tls_test() {
     t2.join();
 }
 
+void test_alloc() {
+    void* ptr = tcmalloc(6);
+}
+
 int main() {
-    tls_test();
+    test_alloc();
     return 0;
 }
