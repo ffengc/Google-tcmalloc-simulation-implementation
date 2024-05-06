@@ -594,3 +594,19 @@ size_t central_cache::fetch_range_obj(void*& start, void*& end, size_t batch_num
 当然cc到这里还没有完全写完的，但是我们要继续先写pc，才能来完善这里的部分。
 
 ## page_cache整体框架
+
+![](./assets/4.png)
+
+**申请内存:**
+1. 当central cache向page cache申请内存时，page cache先检查对应位置有没有span，如果没有 则向更大页寻找一个span，如果找到则分裂成两个。比如:申请的是4页page，4页page后面没 有挂span，则向后面寻找更大的span，假设在10页page位置找到一个span，则将10页page span分裂为一个4页page span和一个6页page span。
+2. 如果找到_spanList[128]都没有合适的span，则向系统使用mmap、brk或者是VirtualAlloc等方式 申请128页page span挂在自由链表中，再重复1中的过程。
+3. 需要注意的是central cache和page cache 的核心结构都是spanlist的哈希桶，但是他们是有本质 区别的，central cache中哈希桶，是按跟thread cache一样的大小对齐关系映射的，他的spanlist 中挂的span中的内存都被按映射关系切好链接成小块内存的自由链表。而page cache 中的 spanlist则是按下标桶号映射的，也就是说第i号桶中挂的span都是i页内存。
+
+
+**释放内存:**
+1. 如果central cache释放回一个span，则依次寻找span的前后page id的没有在使用的空闲span，看是否可以合并，如果合并继续向前寻找。这样就可以将切小的内存合并收缩成大的span，减少内存碎片。
+
+**这里的映射和之前的不一样，这里一共是128个桶，第一个是一页，第二个是两页！**
+
+**pc只关注cc要多少页！注意，单位是页！**
+
