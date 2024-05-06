@@ -1,4 +1,4 @@
-test:*.cc ./thread_cache/*.cc ./central_cache/*.cc
+test: *.cc ./src/*.cc
 	g++ -o $@ $^ -std=c++11 -lpthread
 .PHONY:clean
 clean:

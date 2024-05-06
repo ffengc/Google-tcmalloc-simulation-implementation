@@ -9,12 +9,33 @@
 
 static const size_t MAX_BYTES = 256 * 1024; // 256kb
 static const size_t BUCKETS_NUM = 208; // 一共208个桶
+static const size_t PAGES_NUM = 129; // pageCahche设置128个桶
+static const size_t PAGE_SHIFT = 13;
 
 #if defined(_WIN64) || defined(__x86_64__) || defined(__ppc64__) || defined(__aarch64__)
 typedef unsigned long long PAGE_ID;
 #else
 typedef size_t PAGE_ID;
 #endif
+
+inline static void* system_alloc(size_t kpage) {
+    void* ptr = nullptr;
+#if defined(_WIN32) || defined(_WIN64)
+#include <windows.h>
+    *ptr = VirtualAlloc(0, kpage * (1 << 12), MEM_COMMIT | MEM_RESERVE,
+        PAGE_READWRITE);
+#elif defined(__aarch64__) // ...
+#include <sys/mman.h>
+    void* ptr = mmap(NULL, kpage << 13, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+#else
+#include <iostream>
+    std::cerr << "unknown system" << std::endl;
+    throw std::bad_alloc();
+#endif
+    if (ptr == nullptr)
+        throw std::bad_alloc();
+    return ptr;
+}
 
 // 管理切分好的小对象的自由链表
 class free_list {
@@ -115,6 +136,15 @@ public:
             num = 512;
         return num;
     }
+    // 计算一次向pc获取几个页
+    static inline size_t num_move_page(size_t size) {
+        size_t num = num_move_size(size);
+        size_t npage = num * size;
+        npage >>= PAGE_SHIFT; // 相当于 /= 8kb
+        if (npage == 0)
+            npage = 1;
+        return npage;
+    }
 };
 
 // 管理大块内存
@@ -161,5 +191,20 @@ public:
         prev->__next = next;
         next->__prev = prev;
     }
+    void push_front(span* new_span) {
+        insert(begin(), new_span);
+    }
+    span* pop_front() {
+        span* front = __head->__next;
+        erase(front); // erase只是解除连接，没有删掉front
+        return front;
+    }
+    bool empty() { return __head->__next == __head; }
+
+public:
+    // 遍历相关
+    span* begin() { return __head->__next; }
+    span* end() { return __head; }
 };
+
 #endif

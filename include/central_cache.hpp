@@ -2,7 +2,7 @@
 #ifndef __YUFC_CENTRAL_CACHE_HPP__
 #define __YUFC_CENTRAL_CACHE_HPP__
 
-#include "../common.hpp"
+#include "./common.hpp"
 
 class central_cache {
 private:

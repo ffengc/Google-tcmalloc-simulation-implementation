@@ -1,7 +1,7 @@
 
 
-#include "thread_cache.hpp"
-#include "../central_cache/central_cache.hpp"
+#include "../include/thread_cache.hpp"
+#include "../include/central_cache.hpp"
 
 void* thread_cache::allocate(size_t size) {
     assert(size <= MAX_BYTES);
