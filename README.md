@@ -14,6 +14,9 @@
   - [central\_cache的核心逻辑](#central_cache的核心逻辑)
   - [central\_cache里面fetch\_range\_obj的逻辑](#central_cache里面fetch_range_obj的逻辑)
   - [page\_cache整体框架](#page_cache整体框架)
+  - [获取span详解](#获取span详解)
+    - [关于 new\_span 如何加锁的文字(重要/容易出bug)](#关于-new_span-如何加锁的文字重要容易出bug)
+  - [内存申请流程联调](#内存申请流程联调)
 
 ***
 
@@ -594,3 +597,301 @@ size_t central_cache::fetch_range_obj(void*& start, void*& end, size_t batch_num
 当然cc到这里还没有完全写完的，但是我们要继续先写pc，才能来完善这里的部分。
 
 ## page_cache整体框架
+
+![](./assets/4.png)
+
+**申请内存:**
+1. 当central cache向page cache申请内存时，page cache先检查对应位置有没有span，如果没有 则向更大页寻找一个span，如果找到则分裂成两个。比如:申请的是4页page，4页page后面没 有挂span，则向后面寻找更大的span，假设在10页page位置找到一个span，则将10页page span分裂为一个4页page span和一个6页page span。
+2. 如果找到_spanList[128]都没有合适的span，则向系统使用mmap、brk或者是VirtualAlloc等方式 申请128页page span挂在自由链表中，再重复1中的过程。
+3. 需要注意的是central cache和page cache 的核心结构都是spanlist的哈希桶，但是他们是有本质 区别的，central cache中哈希桶，是按跟thread cache一样的大小对齐关系映射的，他的spanlist 中挂的span中的内存都被按映射关系切好链接成小块内存的自由链表。而page cache 中的 spanlist则是按下标桶号映射的，也就是说第i号桶中挂的span都是i页内存。
+
+
+**释放内存:**
+1. 如果central cache释放回一个span，则依次寻找span的前后page id的没有在使用的空闲span，看是否可以合并，如果合并继续向前寻找。这样就可以将切小的内存合并收缩成大的span，减少内存碎片。
+
+**这里的映射和之前的不一样，这里一共是128个桶，第一个是一页，第二个是两页！**
+
+**pc只关注cc要多少页！注意，单位是页！**
+
+page_cache.hpp
+```cpp
+class page_cache {
+private:
+    span_list __span_lists[PAGES_NUM];
+    std::mutex __page_mtx;
+    static page_cache __s_inst;
+    page_cache() = default;
+    page_cache(const page_cache&) = delete;
+
+public:
+    static page_cache* get_instance() { return &__s_inst; }
+public:
+    // 获取一个K页的span
+};
+```
+
+也是要设计成单例模式。
+
+然后怎么初始化呢？
+
+一开始全部设置为空，然后向OS（heap）要128页的span，然后后面要（假设要两页），那就把这个128页的的切分成126页的和2页的。然后2页的给cc，126页的就挂到126的桶上。
+
+然后当cc有内存不要的时候，就还到对应的span里面去。然后pc通过页号，查看前后相邻页是否空闲，是的话就合并，和病除更大的页，解决内存碎片问题。
+
+## 获取span详解
+
+我们要遍历cc中的span，我们可以在common.hpp里面写一些遍历链表的组建。
+
+common.hpp
+```cpp
+public:
+    // 遍历相关
+    span* begin() { return __head->__next; }
+    span* end() { return __head; }
+```
+
+central_cache.cc
+```cpp
+span* central_cache::get_non_empty_span(span_list& list, size_t size) {
+    // 先查看当前的spanlist中是否还有非空的span
+    span* it = list.begin();
+    while (it != list.end()) {
+        if (it->__free_list != nullptr) // 找到非空的了
+            return it;
+        it = it->__next;
+    }
+    //如果走到这里，说明没有空闲的span了，就要找pc了
+    page_cache::get_instance()->new_span();
+    return nullptr;
+}
+```
+
+问题是，要多少页呢？也是有一个计算方法的，放到size_class里面去！
+
+common.hpp
+```cpp
+    static inline size_t num_move_page(size_t size) {
+        size_t num = num_move_size(size);
+        size_t npage = num * size;
+        npage >>= PAGE_SHIFT; // 相当于 /= 8kb
+        if (npage == 0)
+            npage = 1;
+        return npage;
+    }
+```
+
+所以。
+central_cache.cc
+```cpp
+span* central_cache::get_non_empty_span(span_list& list, size_t size) {
+    // 先查看当前的spanlist中是否还有非空的span
+    span* it = list.begin();
+    while (it != list.end()) {
+        if (it->__free_list != nullptr) // 找到非空的了
+            return it;
+        it = it->__next;
+    }
+    //如果走到这里，说明没有空闲的span了，就要找pc了
+    span* cur_span = page_cache::get_instance()->new_span(size_class::num_move_page(size));
+    // 切分的逻辑
+    return nullptr;
+}
+```
+
+下面就是切分的逻辑了。
+
+怎么找到这个内存的地址呢？
+
+如果页号是100。那么页的起始地址就是 `100 << PAGE_SHIFT`。
+
+central_cache.cc
+```cpp
+span* central_cache::get_non_empty_span(span_list& list, size_t size) {
+    // 先查看当前的spanlist中是否还有非空的span
+    span* it = list.begin();
+    while (it != list.end()) {
+        if (it->__free_list != nullptr) // 找到非空的了
+            return it;
+        it = it->__next;
+    }
+    // 如果走到这里，说明没有空闲的span了，就要找pc了
+    span* cur_span = page_cache::get_instance()->new_span(size_class::num_move_page(size));
+    // 切分的逻辑
+    // 1. 计算span的大块内存的起始地址和大块内存的大小（字节数）
+    char* addr_start = (char*)(cur_span->__page_id << PAGE_SHIFT);
+    size_t bytes = cur_span->__n << PAGE_SHIFT; // << PAGE_SHIFT 就是乘8kb的意思
+    char* addr_end = addr_start + bytes;
+    // 2. 把大块内存切成自由链表链接起来
+    cur_span->__free_list = addr_start; // 先切一块下来做头
+    addr_start += size;
+    void* tail = cur_span->__free_list;
+    while(addr_start < addr_end) {
+        free_list::__next_obj(tail) = addr_start;
+        tail = free_list::__next_obj(tail);
+        addr_start += size;
+    }
+    list.push_front(cur_span);
+    return cur_span;
+}
+```
+
+注意，这里的切分是指把大块内存切成自由链表。不是pc里面的把大页切成小页。
+
+然后写完上面那个，我们既要去写 `span* page_cache::new_span(size_t k)` 了。这里就要把大页切成小页了。
+
+page_cache.cc
+```cpp
+// cc向pc获取k页的span
+span* page_cache::new_span(size_t k) {
+    assert(k > 0 && k < PAGES_NUM);
+    // 先检查第k个桶是否有span
+    if (!__span_lists[k].empty())
+        return __span_lists->pop_front();
+    // 第k个桶是空的->去检查后面的桶里面有无span，如果有，可以把它进行切分
+    for (size_t i = k + 1; i < PAGES_NUM; i++) {
+        if (!__span_lists[i].empty()) {
+            // 可以开始切了
+            // 假设这个页是n页的，需要的是k页的
+            // 1. 从__span_lists中拿下来 2. 切开 3. 一个返回给cc 4. 另一个挂到 n-k 号桶里面去
+            span* n_span = __span_lists[i].pop_front();
+            span* k_span = new span;
+            // 在n_span头部切除k页下来
+            k_span->__page_id = n_span->__page_id; // <1>
+            k_span->__n = k; // <2>
+            n_span->__page_id += k; // <3>
+            n_span->__n -= k; // <4>
+            /**
+             * 这里要好好理解一下 100 ------ 101 ------- 102 ------
+             * 假设n_span从100开始，大小是3
+             * 切出来之后k_span就是从100开始了，所以<1>
+             * 切出来之后k_span就有k页了，所以 <2>
+             * 切出来之后n_span就是从102开始了，所以 <3>
+             * 切出来之后n_span就变成__n-k页了，所以 <4>
+             */
+            // 剩下的挂到相应位置
+            __span_lists[n_span->__n].push_front(n_span);
+            return k_span;
+        }
+    }
+    // 走到这里，说明找不到span了：找os要
+    span* big_span = new span;
+    big_span = 
+}
+```
+
+这里切分的逻辑，代码注释里面写的很清楚了！
+
+然后如果找到128页的都没找到，直接向系统申请！
+
+这里要区分windows和linux。
+
+common.hpp
+```cpp
+inline static void* system_alloc(size_t kpage) {
+    void* ptr = nullptr;
+#if defined(_WIN32) || defined(_WIN64)
+#include <windows.h>
+    *ptr = VirtualAlloc(0, kpage * (1 << 12), MEM_COMMIT | MEM_RESERVE,
+        PAGE_READWRITE);
+#elif defined(__aarch64__) // ...
+#include <sys/mman.h>
+    void* ptr = mmap(NULL, kpage << 13, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+#else
+#include <iostream>
+    std::cerr << "unknown system" << std::endl;
+    throw std::bad_alloc();
+#endif
+    if (ptr == nullptr)
+        throw std::bad_alloc();
+    return ptr;
+}
+```
+
+然后new_span最后：
+
+```cpp
+    // 走到这里，说明找不到span了：找os要
+    span* big_span = new span;
+    void* ptr = system_alloc(PAGES_NUM - 1);
+    big_span->__page_id = (PAGE_ID)ptr >> PAGE_SHIFT;
+    big_span->__n = PAGES_NUM - 1;
+    // 挂到上面去
+    __span_lists[PAGES_NUM - 1].push_front(big_span);
+    return new_span(k);
+```
+
+插入之后，不要重复写切分的逻辑了，递归调用一次自己就行了！
+
+### 关于 new_span 如何加锁的文字(重要/容易出bug)
+
+然后这里还有最关键的一步。这里整个方法是要加锁的！
+
+这里有个关键问题需要思考。
+
+get_non_empty_span是被fetch_range_obj调用的（在cc.cc）里面。
+
+但是get_non_empty_span会去调用pc的new_span。
+现在有个关键问题了，此时，如果我们不做处理，在pc的new_span里面，其实是有cc的桶锁的。
+这个是很不好的。因为这个桶可能有内存需要释放啊！你锁住了，别人就进不去了。
+（其实这里我也是一知半解，要再去理解一下）
+
+所以，在`span* central_cache::get_non_empty_span(span_list& list, size_t size) {`里面这个`span* cur_span = page_cache::get_instance()->new_span(size_class::num_move_page(size));`这句话前面。我们先把桶锁解掉。
+
+然后pc的new_span的全局锁，我们在cc.cc里面的`span* central_cache::get_non_empty_span(span_list& list, size_t size) {` 这里加。
+
+cc.cc
+```cpp
+    // 如果走到这里，说明没有空闲的span了，就要找pc了
+    page_cache::get_instance()->__page_mtx.lock();
+    span* cur_span = page_cache::get_instance()->new_span(size_class::num_move_page(size));
+    page_cache::get_instance()->__page_mtx.unlock();
+```
+
+**现在问题来了，我们cc拿到这个新的span，后面还要切分的。刚刚在拿new_span之前解锁了，现在需要加上吗?**
+
+不需要！
+
+因为这个span是从pc拿来的，新的，也还没挂到cc上面去，所以别的线程拿不到这个span！所以不用加锁！
+
+但是最后一步 `list.push_front(span)` 要访问cc对象了！就要加锁，我们把锁恢复一下。
+
+central_cache.cc
+```cpp
+span* central_cache::get_non_empty_span(span_list& list, size_t size) {
+    // 先查看当前的spanlist中是否还有非空的span
+    span* it = list.begin();
+    while (it != list.end()) {
+        if (it->__free_list != nullptr) // 找到非空的了
+            return it;
+        it = it->__next;
+    }
+    // 这里先解开桶锁
+    list.__bucket_mtx.unlock();
+
+    // 如果走到这里，说明没有空闲的span了，就要找pc了
+    page_cache::get_instance()->__page_mtx.lock();
+    span* cur_span = page_cache::get_instance()->new_span(size_class::num_move_page(size));
+    page_cache::get_instance()->__page_mtx.unlock();
+
+    // 切分的逻辑
+    // 1. 计算span的大块内存的起始地址和大块内存的大小（字节数）
+    char* addr_start = (char*)(cur_span->__page_id << PAGE_SHIFT);
+    size_t bytes = cur_span->__n << PAGE_SHIFT; // << PAGE_SHIFT 就是乘8kb的意思
+    char* addr_end = addr_start + bytes;
+    // 2. 把大块内存切成自由链表链接起来
+    cur_span->__free_list = addr_start; // 先切一块下来做头
+    addr_start += size;
+    void* tail = cur_span->__free_list;
+    while(addr_start < addr_end) {
+        free_list::__next_obj(tail) = addr_start;
+        tail = free_list::__next_obj(tail);
+        addr_start += size;
+    }
+    // 恢复锁
+    list.__bucket_mtx.lock();
+    list.push_front(cur_span);
+    return cur_span;
+}
+```
+
+## 内存申请流程联调
