@@ -58,6 +58,10 @@ void thread_cache::deallocate(void* ptr, size_t size) {
     __free_lists[index].push(ptr);
     // 当链表长度大于一次批量申请的内存的时候，就开始还一段list给cc
     if (__free_lists[index].size() >= __free_lists[index].max_size()) {
+#ifdef PROJECT_DEBUG
+        LOG(DEBUG) << __free_lists[index].size() << ":" << __free_lists[index].max_size() << std::endl;
+        LOG(DEBUG) << "call list_too_long" << std::endl;
+#endif
         list_too_long(__free_lists[index], size);
     }
 }
@@ -66,5 +70,8 @@ void thread_cache::list_too_long(free_list& list, size_t size) {
     void* start = nullptr;
     void* end = nullptr;
     list.pop(start, end, list.max_size());
+    #ifdef PROJECT_DEBUG
+    LOG(DEBUG) << "list pop success -> call release_list_to_spans()" << std::endl;
+    #endif
     central_cache::get_instance()->release_list_to_spans(start, size);
 }

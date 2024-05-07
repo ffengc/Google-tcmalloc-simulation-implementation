@@ -8,6 +8,11 @@
 #include <mutex>
 #include <unordered_map>
 
+#ifdef PROJECT_DEBUG
+#include "log.hpp"
+#include <iostream>
+#endif
+
 #if defined(_WIN32) || defined(_WIN64)
 #include <windows.h>
 #elif defined(__aarch64__) // ...
@@ -70,9 +75,13 @@ public:
         return obj;
     }
     void pop(void*& start, void*& end, size_t n) {
-        // 这里是输出参数了
-        assert(n >= __size);
+// 这里是输出参数了
+#ifdef PROJECT_DEBUG
+        LOG(DEBUG) << "call here" << std::endl;
+#endif
+        assert(n <= __size);
         start = __free_list_ptr;
+        end = start; // debug 20240507 miss this
         for (size_t i = 0; i < n - 1; i++)
             end = free_list::__next_obj(end);
         __free_list_ptr = free_list::__next_obj(end);
@@ -178,6 +187,7 @@ public:
     span* __prev = nullptr;
     size_t __use_count = 0; // 切成段小块内存，被分配给threadCache的计数器
     void* __free_list = nullptr; // 切好的小块内存的自由链表
+    bool __is_use = false; // 是否在被使用
 };
 
 // 带头双向循环链表

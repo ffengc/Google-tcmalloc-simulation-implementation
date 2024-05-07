@@ -53,6 +53,7 @@ span* central_cache::get_non_empty_span(span_list& list, size_t size) {
 #endif
     page_cache::get_instance()->__page_mtx.lock();
     span* cur_span = page_cache::get_instance()->new_span(size_class::num_move_page(size));
+    cur_span->__is_use = true; // 表示已经被使用
     page_cache::get_instance()->__page_mtx.unlock();
 #ifdef PROJECT_DEBUG
     LOG(DEBUG) << "central_cache::get_non_empty_span() get new span success" << std::endl;
@@ -96,7 +97,13 @@ void central_cache::release_list_to_spans(void* start, size_t size) {
             // 说明这个span切分出去的所有小块都回来了
             // 归还给pagecache
             // 1. 把这一页从cc的这个桶的spanlist中拿掉
+            // #ifdef PROJECT_DEBUG
+            //             LOG(DEBUG) << "***" << std::endl;
+            // #endif
             __span_lists[index].erase(cur_span); // 从桶里面拿走
+            // #ifdef PROJECT_DEBUG
+            //             LOG(DEBUG) << "after ***" << std::endl;
+            // #endif
             // 2. 此时不用管这个span的freelist了，因为这些内存本来就是span初始地址后面的，然后顺序也是乱的，直接置空即可
             //      (这里还不太理解)
             cur_span->__free_list = nullptr;

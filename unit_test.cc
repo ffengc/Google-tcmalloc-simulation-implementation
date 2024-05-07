@@ -2,7 +2,10 @@
 
 #include "./include/tcmalloc.hpp"
 #include <iostream>
+#include <map>
+#include <random>
 #include <thread>
+#include <functional>
 
 void alloc1() {
     for (size_t i = 0; i < 5; i++) {
@@ -41,7 +44,31 @@ void test_alloc2() {
     void* p2 = tcmalloc(6); // 这一次一定会找新的span
 }
 
+void test_dealloc(int alloc_times = 10) {
+    // 创建随机数生成器
+    std::random_device rd;
+    std::mt19937 gen(rd()); // 以随机设备作为种子
+    std::uniform_int_distribution<> distrib(1, 127 * 1024); // 设置随机数分布范围1-127
+    // 生成并输出随机数
+    std::map<void*, size_t> s;
+    for (int i = 0; i < alloc_times; i++) {
+        int sz = distrib(gen);
+        s.insert({ tcmalloc(sz), sz }); // 申请随机值
+    }
+    for (auto& e : s) {
+        tcfree(e.first, e.second);
+    }
+}
+
+void test_multi_thread() {
+    std::thread t1(std::bind(test_dealloc, 200));
+    // std::thread t2(std::bind(test_dealloc, 20));
+    t1.join();
+    // t2.join();
+    std::cout << "run successful" << std::endl;
+}
+
 int main() {
-    test_alloc2();
+    test_multi_thread();
     return 0;
 }

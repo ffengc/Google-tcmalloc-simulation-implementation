@@ -19,6 +19,7 @@
   - [内存申请流程联调](#内存申请流程联调)
   - [thread\_cache内存释放](#thread_cache内存释放)
   - [central\_cache内存释放](#central_cache内存释放)
+  - [page\_cache内存释放](#page_cache内存释放)
 
 ***
 
@@ -1111,3 +1112,72 @@ void central_cache::release_list_to_spans(void* start, size_t size) {
 细节在注释里面写的很清楚了。
 
 要注意，调用pc的接口的时候，就记得把桶锁解掉。
+
+## page_cache内存释放
+
+就是这个函数。
+
+```cpp
+void page_cache::release_span_to_page(span* s) {
+    // 对span前后对页尝试进行合并，缓解内存碎片问题
+}
+```
+
+然后刚才的map可以帮助我们查找前后的page。
+
+然后我们前后找的时候，要区分这个页是不是在centralCache上的，如果在cc上，那就不能合并。
+
+然后这个判断不能用use_count==0这个判断条件。有可能这个span刚从pc拿过来，还没给别人的时候，use_count就是0，这个span，pc是不能回收合并的。
+
+所以可以给span添加一个参数is_use就行了。
+
+```cpp
+// 管理大块内存
+class span {
+public:
+    PAGE_ID __page_id; // 大块内存起始页的页号
+    size_t __n = 0; // 页的数量
+    // 双向链表结构
+    span* __next = nullptr;
+    span* __prev = nullptr;
+    size_t __use_count = 0; // 切成段小块内存，被分配给threadCache的计数器
+    void* __free_list = nullptr; // 切好的小块内存的自由链表
+    bool is_use = false; // 是否在被使用
+};
+```
+
+然后cc.cc这里改一下，拿到之后改成true就行。
+
+cc.cc
+```cpp
+    page_cache::get_instance()->__page_mtx.lock();
+    span* cur_span = page_cache::get_instance()->new_span(size_class::num_move_page(size));
+    cur_span->is_use = true; // 表示已经被使用
+    page_cache::get_instance()->__page_mtx.unlock();
+```
+
+
+然后继续写这个逻辑:
+
+page_cache.cc
+```cpp
+void page_cache::release_span_to_page(span* s) {
+    // 对span前后对页尝试进行合并，缓解内存碎片问题
+    PAGE_ID prev_id = s->__page_id - 1; // 前一块span的id一定是当前span的id-1
+    // 拿到id如何找span: 之前写好的map能拿到吗？
+}
+```
+
+现在的问题是，之前的map能拿到吗？还拿不到，因为我们之前的map只记录了分给cc的span的映射，没有存留在pc那些，没有分出去的映射。
+所以我们要在`span* page_cache::new_span(size_t k) {`里面添加一下，留在pagecache那些块的映射。
+
+```cpp
+            // 存储n_span的首尾页号跟n_span的映射，方便pc回收内存时进行合并查找
+            __id_span_map[n_span->__page_id] = n_span;
+            __id_span_map[n_span->__page_id + n_span->__n - 1] = n_span;
+```
+
+为什么这里不用循环存储呢？
+
+因为这里的pc的内存只是被span挂起来啊，不会被切啊，所以知道地址就了啊！
+给cc的那些，会被切开变成很多固定大小的内存块啊！所以这里不用循环存。
