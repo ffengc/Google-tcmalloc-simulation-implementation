@@ -12,7 +12,9 @@ void* thread_cache::allocate(size_t size) {
         return __free_lists[bucket_index].pop();
     } else {
         // 这个桶下面没有内存了！找centralCache找
+#ifdef PROJECT_DEBUG
         LOG(DEBUG) << "thread_cache::allocate call thread_cache::fetch_from_central_cache" << std::endl;
+#endif
         return fetch_from_central_cache(bucket_index, align_size);
     }
 }
@@ -37,9 +39,14 @@ void* thread_cache::fetch_from_central_cache(size_t index, size_t size) {
     // 开始获取内存了
     void* start = nullptr;
     void* end = nullptr;
-    LOG(DEBUG) << "thread_cache::fetch_from_central_cache call  central_cache::get_instance()->fetch_range_obj()" <<  std::endl;
+#ifdef PROJECT_DEBUG
+    LOG(DEBUG) << "thread_cache::fetch_from_central_cache call  central_cache::get_instance()->fetch_range_obj()" << std::endl;
+#endif
     size_t actual_n = central_cache::get_instance()->fetch_range_obj(start, end, batch_num, size);
-    LOG(DEBUG) << "actual_n" << ":" <<actual_n << std::endl;
+#ifdef PROJECT_DEBUG
+    LOG(DEBUG) << "actual_n"
+               << ":" << actual_n << std::endl;
+#endif
     assert(actual_n >= 1);
     if (actual_n == 1) {
         assert(start == end);

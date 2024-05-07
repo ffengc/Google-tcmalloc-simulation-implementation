@@ -895,3 +895,81 @@ span* central_cache::get_non_empty_span(span_list& list, size_t size) {
 ```
 
 ## 内存申请流程联调
+
+先给每一步打上日志，看看调用的流程。
+
+然后多次调用tcmalloc，看看日志。
+
+unit_test.cc
+```cpp
+void test_alloc() {
+    std::cout << "call tcmalloc(1)" << std::endl;
+    void* ptr = tcmalloc(8 * 1024);
+    std::cout << "call tcmalloc(2)" << std::endl;
+    ptr = tcmalloc(10);
+    std::cout << "call tcmalloc(3)" << std::endl;
+    ptr = tcmalloc(2);
+    std::cout << "call tcmalloc(4)" << std::endl;
+    ptr = tcmalloc(1);
+    std::cout << "call tcmalloc(5)" << std::endl;
+    ptr = tcmalloc(1);
+    std::cout << "call tcmalloc(6)" << std::endl;
+    ptr = tcmalloc(5);
+    std::cout << "call tcmalloc(7)" << std::endl;
+    ptr = tcmalloc(1);
+}
+```
+
+输出日志：
+```bash
+call tcmalloc(1)
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][src/thread_cache.cc][16] thread_cache::allocate call thread_cache::fetch_from_central_cache
+[DEBUG][src/thread_cache.cc][43] thread_cache::fetch_from_central_cache call  central_cache::get_instance()->fetch_range_obj()
+[DEBUG][src/central_cache.cc][12] central_cache::fetch_range_obj() call central_cache::get_non_empty_span()
+[DEBUG][src/central_cache.cc][45] central_cache::get_non_empty_span() cannot find non-null span in cc, goto pc for mem
+[DEBUG][src/central_cache.cc][52] central_cache::get_non_empty_span() call page_cache::get_instance()->new_span()
+[DEBUG][src/page_cache.cc][43] page_cache::new_span() cannot find span, goto os for mem
+[DEBUG][src/page_cache.cc][37] page_cache::new_span() have span, return
+[DEBUG][src/central_cache.cc][58] central_cache::get_non_empty_span() get new span success
+[DEBUG][src/central_cache.cc][70] central_cache::get_non_empty_span() cut span
+[DEBUG][src/thread_cache.cc][47] actual_n:1
+call tcmalloc(2)
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][src/thread_cache.cc][16] thread_cache::allocate call thread_cache::fetch_from_central_cache
+[DEBUG][src/thread_cache.cc][43] thread_cache::fetch_from_central_cache call  central_cache::get_instance()->fetch_range_obj()
+[DEBUG][src/central_cache.cc][12] central_cache::fetch_range_obj() call central_cache::get_non_empty_span()
+[DEBUG][src/central_cache.cc][45] central_cache::get_non_empty_span() cannot find non-null span in cc, goto pc for mem
+[DEBUG][src/central_cache.cc][52] central_cache::get_non_empty_span() call page_cache::get_instance()->new_span()
+[DEBUG][src/page_cache.cc][37] page_cache::new_span() have span, return
+[DEBUG][src/central_cache.cc][58] central_cache::get_non_empty_span() get new span success
+[DEBUG][src/central_cache.cc][70] central_cache::get_non_empty_span() cut span
+[DEBUG][src/thread_cache.cc][47] actual_n:1
+call tcmalloc(3)
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][src/thread_cache.cc][16] thread_cache::allocate call thread_cache::fetch_from_central_cache
+[DEBUG][src/thread_cache.cc][43] thread_cache::fetch_from_central_cache call  central_cache::get_instance()->fetch_range_obj()
+[DEBUG][src/central_cache.cc][12] central_cache::fetch_range_obj() call central_cache::get_non_empty_span()
+[DEBUG][src/central_cache.cc][45] central_cache::get_non_empty_span() cannot find non-null span in cc, goto pc for mem
+[DEBUG][src/central_cache.cc][52] central_cache::get_non_empty_span() call page_cache::get_instance()->new_span()
+[DEBUG][src/page_cache.cc][37] page_cache::new_span() have span, return
+[DEBUG][src/central_cache.cc][58] central_cache::get_non_empty_span() get new span success
+[DEBUG][src/central_cache.cc][70] central_cache::get_non_empty_span() cut span
+[DEBUG][src/thread_cache.cc][47] actual_n:1
+call tcmalloc(4)
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][src/thread_cache.cc][16] thread_cache::allocate call thread_cache::fetch_from_central_cache
+[DEBUG][src/thread_cache.cc][43] thread_cache::fetch_from_central_cache call  central_cache::get_instance()->fetch_range_obj()
+[DEBUG][src/central_cache.cc][12] central_cache::fetch_range_obj() call central_cache::get_non_empty_span()
+[DEBUG][src/thread_cache.cc][47] actual_n:2
+call tcmalloc(5)
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+call tcmalloc(6)
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][src/thread_cache.cc][16] thread_cache::allocate call thread_cache::fetch_from_central_cache
+[DEBUG][src/thread_cache.cc][43] thread_cache::fetch_from_central_cache call  central_cache::get_instance()->fetch_range_obj()
+[DEBUG][src/central_cache.cc][12] central_cache::fetch_range_obj() call central_cache::get_non_empty_span()
+[DEBUG][src/thread_cache.cc][47] actual_n:3
+call tcmalloc(7)
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+```

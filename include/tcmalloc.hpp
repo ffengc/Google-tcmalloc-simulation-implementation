@@ -10,7 +10,9 @@ static void* tcmalloc(size_t size) {
     if (p_tls_thread_cache == nullptr)
         // 相当于单例
         p_tls_thread_cache = new thread_cache;
+#ifdef PROJECT_DEBUG
     LOG(DEBUG) << "tcmalloc find tc from mem" << std::endl;
+#endif
     return p_tls_thread_cache->allocate(size);
 }
 

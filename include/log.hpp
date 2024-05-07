@@ -16,7 +16,6 @@ enum STATUES // 日志等级
 };
 // LOG() << "message"
 inline std::ostream& Log(const std::string& level, const std::string& file_name, int line) {
-#ifdef PROJECT_DEBUG
     // 添加日志等级
     std::string message = "[";
     message += level;
@@ -31,8 +30,6 @@ inline std::ostream& Log(const std::string& level, const std::string& file_name,
     message += "]";
     // cout 本质内部是包含缓冲区的
     std::cout << message << " "; // 不要endl进行刷新
-#else
-#endif
     return std::cout;
 }
 
