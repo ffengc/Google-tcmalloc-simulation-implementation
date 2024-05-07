@@ -6,6 +6,7 @@
 #include <algorithm>
 #include <assert.h>
 #include <mutex>
+#include <unordered_map>
 
 #if defined(_WIN32) || defined(_WIN64)
 #include <windows.h>
@@ -47,25 +48,40 @@ class free_list {
 private:
     void* __free_list_ptr = nullptr;
     size_t __max_size = 1;
+    size_t __size = 0;
 
 public:
     void push(void* obj) {
         assert(obj);
         __next_obj(obj) = __free_list_ptr;
         __free_list_ptr = obj;
+        ++__size;
     }
-    void push(void* start, void* end) {
+    void push(void* start, void* end, size_t n) {
         __next_obj(end) = __free_list_ptr;
         __free_list_ptr = start;
+        __size += n;
     }
     void* pop() {
         assert(__free_list_ptr);
         void* obj = __free_list_ptr;
         __free_list_ptr = __next_obj(obj);
+        --__size;
         return obj;
+    }
+    void pop(void*& start, void*& end, size_t n) {
+        // 这里是输出参数了
+        assert(n >= __size);
+        start = __free_list_ptr;
+        for (size_t i = 0; i < n - 1; i++)
+            end = free_list::__next_obj(end);
+        __free_list_ptr = free_list::__next_obj(end);
+        free_list::__next_obj(end) = nullptr;
+        __size -= n;
     }
     bool empty() { return __free_list_ptr == nullptr; }
     size_t& max_size() { return __max_size; }
+    size_t size() { return __size; }
 
 public:
     static void*& __next_obj(void* obj) {

@@ -33,6 +33,10 @@ span* page_cache::new_span(size_t k) {
              */
             // 剩下的挂到相应位置
             __span_lists[n_span->__n].push_front(n_span);
+            // 这里记录映射(简历id和span的映射，方便cc回收小块内存时，查找对应的span)
+            for (PAGE_ID j = 0; j < k_span->__n; j++) {
+                __id_span_map[k_span->__page_id + j] = k_span;
+            }
 #ifdef PROJECT_DEBUG
             LOG(DEBUG) << "page_cache::new_span() have span, return" << std::endl;
 #endif
@@ -50,4 +54,18 @@ span* page_cache::new_span(size_t k) {
     // 挂到上面去
     __span_lists[PAGES_NUM - 1].push_front(big_span);
     return new_span(k);
+}
+
+span* page_cache::map_obj_to_span(void* obj) {
+    // 先把页号算出来
+    PAGE_ID id = (PAGE_ID)obj >> PAGE_SHIFT; // 这个理论推导可以自行推导一下
+    auto ret = __id_span_map.find(id);
+    if (ret != __id_span_map.end())
+        return ret->second;
+    LOG(FATAL);
+    assert(false);
+    return nullptr;
+}
+
+void page_cache::release_span_to_page(span* s) {
 }

@@ -17,6 +17,8 @@
   - [获取span详解](#获取span详解)
     - [关于 new\_span 如何加锁的文字(重要/容易出bug)](#关于-new_span-如何加锁的文字重要容易出bug)
   - [内存申请流程联调](#内存申请流程联调)
+  - [thread\_cache内存释放](#thread_cache内存释放)
+  - [central\_cache内存释放](#central_cache内存释放)
 
 ***
 
@@ -973,3 +975,139 @@ call tcmalloc(6)
 call tcmalloc(7)
 [DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
 ```
+
+
+同样，再测一次。
+
+```cpp
+void test_alloc2() {
+    for (size_t i = 0; i < 1024; ++i) {
+        void* p1 = tcmalloc(6);
+    }
+    void* p2 = tcmalloc(6); // 这一次一定会找新的span
+}
+```
+
+如果申请1024次6字节（对齐后为8字节），第1025次申请，一定会向系统申请新的span了，之前都不需要的！所以预期输出只有两个`goto os for mem`。
+
+输出日志放在了 `./test/test1.log` 。
+
+
+## thread_cache内存释放
+
+当链表长度大于一次批量申请的内存的时候，就开始还一段list给cc
+
+thread_cache.cc
+```cpp
+void thread_cache::deallocate(void* ptr, size_t size) {
+    assert(ptr);
+    assert(size <= MAX_BYTES);
+    size_t index = size_class::bucket_index(size);
+    __free_lists[index].push(ptr);
+    // 当链表长度大于一次批量申请的内存的时候，就开始还一段list给cc
+    if (__free_lists[index].size() >= __free_lists[index].max_size()) {
+        list_too_long(__free_lists[index], size);
+    }
+}
+```
+
+thread_cache.cc
+```cpp
+void thread_cache::list_too_long(free_list& list, size_t size) {
+    void* start = nullptr;
+    void* end = nullptr;
+    list.pop(start, end, list.max_size());
+    central_cache::get_instance()->release_list_to_spans(start, size);
+}
+```
+
+tcmalloc的规则更复杂，可能还会控制内存大小，超过...就会释放等。
+
+
+## central_cache内存释放
+
+```cpp
+void central_cache::release_list_to_spans(void* start, size_t size) {
+    size_t index = size_class::bucket_index(size); // 先算一下在哪一个桶里面
+    __span_lists[index].__bucket_mtx.lock();
+    // 这里要注意，一个桶挂了多个span，这些内存块挂到哪一个span是不确定的
+
+    __span_lists[index].__bucket_mtx.unlock();
+}
+```
+
+**这里的问题是：如何确定每一块内存块应该到哪一个span里面去。**
+
+
+现在要判断，这些内存块，是来自哪个span的，然后span是从page切出来的，page是有地址的，span也是有地址的。
+
+所以最好在page里面的时候，先让pageid和span的地址映射起来先。
+
+在pc.hpp里面增加。
+```cpp
+std::unordered_map<PAGE_ID, span*> __id_span_map;
+```
+
+**然后在new_span里面，把新的span分给cc的时候，记录一下映射。**
+
+然后pc里面提供一个方法，获取对象到span映射。
+
+page_cache.cc
+```cpp
+span* page_cache::map_obj_to_span(void* obj) {
+    // 先把页号算出来
+    PAGE_ID id = (PAGE_ID)obj >> PAGE_SHIFT; // 这个理论推导可以自行推导一下
+    auto ret = __id_span_map.find(id);
+    if (ret != __id_span_map.end())
+        return ret->second;
+    LOG(FATAL);
+    assert(false);
+    return nullptr;
+}
+```
+
+此时就可以通过一个对象，获取到对应是哪一个span了。
+
+此时就可以继续写`release_list_to_spans`了。
+
+```cpp
+void central_cache::release_list_to_spans(void* start, size_t size) {
+    size_t index = size_class::bucket_index(size); // 先算一下在哪一个桶里面
+    __span_lists[index].__bucket_mtx.lock();
+    // 这里要注意，一个桶挂了多个span，这些内存块挂到哪一个span是不确定的
+    while (start) {
+        // 遍历这个链表
+        void* next = free_list::__next_obj(start); // 先记录一下下一个，避免等下找不到了
+        span* cur_span = page_cache::get_instance()->map_obj_to_span(start);
+        free_list::__next_obj(start) = cur_span->__free_list;
+        cur_span->__free_list = start;
+        // 处理usecount
+        cur_span->__use_count--;
+        if (cur_span->__use_count == 0) {
+            // 说明这个span切分出去的所有小块都回来了
+            // 归还给pagecache
+            // 1. 把这一页从cc的这个桶的spanlist中拿掉
+            __span_lists[index].erase(cur_span); // 从桶里面拿走
+            // 2. 此时不用管这个span的freelist了，因为这些内存本来就是span初始地址后面的，然后顺序也是乱的，直接置空即可
+            //      (这里还不太理解)
+            cur_span->__free_list = nullptr;
+            cur_span->__next = cur_span->__prev = nullptr;
+            // 页号，页数是不能动的！
+            // 3. 解开桶锁
+            __span_lists[index].__bucket_mtx.unlock();
+            // 4. 还给pc
+            page_cache::get_instance()->__page_mtx.lock();
+            page_cache::get_instance()->release_span_to_page(cur_span);
+            page_cache::get_instance()->__page_mtx.unlock();
+            // 5. 恢复桶锁
+            __span_lists[index].__bucket_mtx.lock();
+        }
+        start = next;
+    }
+    __span_lists[index].__bucket_mtx.unlock();
+}
+```
+
+细节在注释里面写的很清楚了。
+
+要注意，调用pc的接口的时候，就记得把桶锁解掉。

@@ -17,7 +17,7 @@ void tls_test() {
     t2.join();
 }
 
-void test_alloc() {
+void test_alloc1() {
     std::cout << "call tcmalloc(1)" << std::endl;
     void* ptr = tcmalloc(8 * 1024);
     std::cout << "call tcmalloc(2)" << std::endl;
@@ -34,7 +34,14 @@ void test_alloc() {
     ptr = tcmalloc(1);
 }
 
+void test_alloc2() {
+    for (size_t i = 0; i < 1024; ++i) {
+        void* p1 = tcmalloc(6);
+    }
+    void* p2 = tcmalloc(6); // 这一次一定会找新的span
+}
+
 int main() {
-    test_alloc();
+    test_alloc2();
     return 0;
 }

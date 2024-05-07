@@ -19,14 +19,6 @@ void* thread_cache::allocate(size_t size) {
     }
 }
 
-void thread_cache::deallocate(void* ptr, size_t size) {
-    assert(ptr);
-    assert(size <= MAX_BYTES);
-    size_t index = size_class::bucket_index(size);
-    __free_lists[index].push(ptr);
-    // ... 如果太长了，还给centralCache
-}
-
 void* thread_cache::fetch_from_central_cache(size_t index, size_t size) {
     // 慢开始反馈调节算法
     size_t batch_num = std::min(__free_lists[index].max_size(), size_class::num_move_size(size));
@@ -52,9 +44,27 @@ void* thread_cache::fetch_from_central_cache(size_t index, size_t size) {
         assert(start == end);
         return start;
     } else {
-        __free_lists[index].push(free_list::__next_obj(start), end);
+        __free_lists[index].push(free_list::__next_obj(start), end, actual_n - 1);
         return start;
     }
 
     return nullptr;
+}
+
+void thread_cache::deallocate(void* ptr, size_t size) {
+    assert(ptr);
+    assert(size <= MAX_BYTES);
+    size_t index = size_class::bucket_index(size);
+    __free_lists[index].push(ptr);
+    // 当链表长度大于一次批量申请的内存的时候，就开始还一段list给cc
+    if (__free_lists[index].size() >= __free_lists[index].max_size()) {
+        list_too_long(__free_lists[index], size);
+    }
+}
+
+void thread_cache::list_too_long(free_list& list, size_t size) {
+    void* start = nullptr;
+    void* end = nullptr;
+    list.pop(start, end, list.max_size());
+    central_cache::get_instance()->release_list_to_spans(start, size);
 }
