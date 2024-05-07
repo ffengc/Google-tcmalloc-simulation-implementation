@@ -17,6 +17,11 @@
   - [获取span详解](#获取span详解)
     - [关于 new\_span 如何加锁的文字(重要/容易出bug)](#关于-new_span-如何加锁的文字重要容易出bug)
   - [内存申请流程联调](#内存申请流程联调)
+  - [thread\_cache内存释放](#thread_cache内存释放)
+  - [central\_cache内存释放](#central_cache内存释放)
+  - [page\_cache内存释放](#page_cache内存释放)
+  - [大于256k的情况](#大于256k的情况)
+  - [处理代码中`new`的问题](#处理代码中new的问题)
 
 ***
 
@@ -895,3 +900,300 @@ span* central_cache::get_non_empty_span(span_list& list, size_t size) {
 ```
 
 ## 内存申请流程联调
+
+先给每一步打上日志，看看调用的流程。
+
+然后多次调用tcmalloc，看看日志。
+
+unit_test.cc
+```cpp
+void test_alloc() {
+    std::cout << "call tcmalloc(1)" << std::endl;
+    void* ptr = tcmalloc(8 * 1024);
+    std::cout << "call tcmalloc(2)" << std::endl;
+    ptr = tcmalloc(10);
+    std::cout << "call tcmalloc(3)" << std::endl;
+    ptr = tcmalloc(2);
+    std::cout << "call tcmalloc(4)" << std::endl;
+    ptr = tcmalloc(1);
+    std::cout << "call tcmalloc(5)" << std::endl;
+    ptr = tcmalloc(1);
+    std::cout << "call tcmalloc(6)" << std::endl;
+    ptr = tcmalloc(5);
+    std::cout << "call tcmalloc(7)" << std::endl;
+    ptr = tcmalloc(1);
+}
+```
+
+输出日志：
+```bash
+call tcmalloc(1)
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][src/thread_cache.cc][16] thread_cache::allocate call thread_cache::fetch_from_central_cache
+[DEBUG][src/thread_cache.cc][43] thread_cache::fetch_from_central_cache call  central_cache::get_instance()->fetch_range_obj()
+[DEBUG][src/central_cache.cc][12] central_cache::fetch_range_obj() call central_cache::get_non_empty_span()
+[DEBUG][src/central_cache.cc][45] central_cache::get_non_empty_span() cannot find non-null span in cc, goto pc for mem
+[DEBUG][src/central_cache.cc][52] central_cache::get_non_empty_span() call page_cache::get_instance()->new_span()
+[DEBUG][src/page_cache.cc][43] page_cache::new_span() cannot find span, goto os for mem
+[DEBUG][src/page_cache.cc][37] page_cache::new_span() have span, return
+[DEBUG][src/central_cache.cc][58] central_cache::get_non_empty_span() get new span success
+[DEBUG][src/central_cache.cc][70] central_cache::get_non_empty_span() cut span
+[DEBUG][src/thread_cache.cc][47] actual_n:1
+call tcmalloc(2)
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][src/thread_cache.cc][16] thread_cache::allocate call thread_cache::fetch_from_central_cache
+[DEBUG][src/thread_cache.cc][43] thread_cache::fetch_from_central_cache call  central_cache::get_instance()->fetch_range_obj()
+[DEBUG][src/central_cache.cc][12] central_cache::fetch_range_obj() call central_cache::get_non_empty_span()
+[DEBUG][src/central_cache.cc][45] central_cache::get_non_empty_span() cannot find non-null span in cc, goto pc for mem
+[DEBUG][src/central_cache.cc][52] central_cache::get_non_empty_span() call page_cache::get_instance()->new_span()
+[DEBUG][src/page_cache.cc][37] page_cache::new_span() have span, return
+[DEBUG][src/central_cache.cc][58] central_cache::get_non_empty_span() get new span success
+[DEBUG][src/central_cache.cc][70] central_cache::get_non_empty_span() cut span
+[DEBUG][src/thread_cache.cc][47] actual_n:1
+call tcmalloc(3)
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][src/thread_cache.cc][16] thread_cache::allocate call thread_cache::fetch_from_central_cache
+[DEBUG][src/thread_cache.cc][43] thread_cache::fetch_from_central_cache call  central_cache::get_instance()->fetch_range_obj()
+[DEBUG][src/central_cache.cc][12] central_cache::fetch_range_obj() call central_cache::get_non_empty_span()
+[DEBUG][src/central_cache.cc][45] central_cache::get_non_empty_span() cannot find non-null span in cc, goto pc for mem
+[DEBUG][src/central_cache.cc][52] central_cache::get_non_empty_span() call page_cache::get_instance()->new_span()
+[DEBUG][src/page_cache.cc][37] page_cache::new_span() have span, return
+[DEBUG][src/central_cache.cc][58] central_cache::get_non_empty_span() get new span success
+[DEBUG][src/central_cache.cc][70] central_cache::get_non_empty_span() cut span
+[DEBUG][src/thread_cache.cc][47] actual_n:1
+call tcmalloc(4)
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][src/thread_cache.cc][16] thread_cache::allocate call thread_cache::fetch_from_central_cache
+[DEBUG][src/thread_cache.cc][43] thread_cache::fetch_from_central_cache call  central_cache::get_instance()->fetch_range_obj()
+[DEBUG][src/central_cache.cc][12] central_cache::fetch_range_obj() call central_cache::get_non_empty_span()
+[DEBUG][src/thread_cache.cc][47] actual_n:2
+call tcmalloc(5)
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+call tcmalloc(6)
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][src/thread_cache.cc][16] thread_cache::allocate call thread_cache::fetch_from_central_cache
+[DEBUG][src/thread_cache.cc][43] thread_cache::fetch_from_central_cache call  central_cache::get_instance()->fetch_range_obj()
+[DEBUG][src/central_cache.cc][12] central_cache::fetch_range_obj() call central_cache::get_non_empty_span()
+[DEBUG][src/thread_cache.cc][47] actual_n:3
+call tcmalloc(7)
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+```
+
+
+同样，再测一次。
+
+```cpp
+void test_alloc2() {
+    for (size_t i = 0; i < 1024; ++i) {
+        void* p1 = tcmalloc(6);
+    }
+    void* p2 = tcmalloc(6); // 这一次一定会找新的span
+}
+```
+
+如果申请1024次6字节（对齐后为8字节），第1025次申请，一定会向系统申请新的span了，之前都不需要的！所以预期输出只有两个`goto os for mem`。
+
+输出日志放在了 `./test/test1.log` 。
+
+
+## thread_cache内存释放
+
+当链表长度大于一次批量申请的内存的时候，就开始还一段list给cc
+
+thread_cache.cc
+```cpp
+void thread_cache::deallocate(void* ptr, size_t size) {
+    assert(ptr);
+    assert(size <= MAX_BYTES);
+    size_t index = size_class::bucket_index(size);
+    __free_lists[index].push(ptr);
+    // 当链表长度大于一次批量申请的内存的时候，就开始还一段list给cc
+    if (__free_lists[index].size() >= __free_lists[index].max_size()) {
+        list_too_long(__free_lists[index], size);
+    }
+}
+```
+
+thread_cache.cc
+```cpp
+void thread_cache::list_too_long(free_list& list, size_t size) {
+    void* start = nullptr;
+    void* end = nullptr;
+    list.pop(start, end, list.max_size());
+    central_cache::get_instance()->release_list_to_spans(start, size);
+}
+```
+
+tcmalloc的规则更复杂，可能还会控制内存大小，超过...就会释放等。
+
+
+## central_cache内存释放
+
+```cpp
+void central_cache::release_list_to_spans(void* start, size_t size) {
+    size_t index = size_class::bucket_index(size); // 先算一下在哪一个桶里面
+    __span_lists[index].__bucket_mtx.lock();
+    // 这里要注意，一个桶挂了多个span，这些内存块挂到哪一个span是不确定的
+
+    __span_lists[index].__bucket_mtx.unlock();
+}
+```
+
+**这里的问题是：如何确定每一块内存块应该到哪一个span里面去。**
+
+
+现在要判断，这些内存块，是来自哪个span的，然后span是从page切出来的，page是有地址的，span也是有地址的。
+
+所以最好在page里面的时候，先让pageid和span的地址映射起来先。
+
+在pc.hpp里面增加。
+```cpp
+std::unordered_map<PAGE_ID, span*> __id_span_map;
+```
+
+**然后在new_span里面，把新的span分给cc的时候，记录一下映射。**
+
+然后pc里面提供一个方法，获取对象到span映射。
+
+page_cache.cc
+```cpp
+span* page_cache::map_obj_to_span(void* obj) {
+    // 先把页号算出来
+    PAGE_ID id = (PAGE_ID)obj >> PAGE_SHIFT; // 这个理论推导可以自行推导一下
+    auto ret = __id_span_map.find(id);
+    if (ret != __id_span_map.end())
+        return ret->second;
+    LOG(FATAL);
+    assert(false);
+    return nullptr;
+}
+```
+
+此时就可以通过一个对象，获取到对应是哪一个span了。
+
+此时就可以继续写`release_list_to_spans`了。
+
+```cpp
+void central_cache::release_list_to_spans(void* start, size_t size) {
+    size_t index = size_class::bucket_index(size); // 先算一下在哪一个桶里面
+    __span_lists[index].__bucket_mtx.lock();
+    // 这里要注意，一个桶挂了多个span，这些内存块挂到哪一个span是不确定的
+    while (start) {
+        // 遍历这个链表
+        void* next = free_list::__next_obj(start); // 先记录一下下一个，避免等下找不到了
+        span* cur_span = page_cache::get_instance()->map_obj_to_span(start);
+        free_list::__next_obj(start) = cur_span->__free_list;
+        cur_span->__free_list = start;
+        // 处理usecount
+        cur_span->__use_count--;
+        if (cur_span->__use_count == 0) {
+            // 说明这个span切分出去的所有小块都回来了
+            // 归还给pagecache
+            // 1. 把这一页从cc的这个桶的spanlist中拿掉
+            __span_lists[index].erase(cur_span); // 从桶里面拿走
+            // 2. 此时不用管这个span的freelist了，因为这些内存本来就是span初始地址后面的，然后顺序也是乱的，直接置空即可
+            //      (这里还不太理解)
+            cur_span->__free_list = nullptr;
+            cur_span->__next = cur_span->__prev = nullptr;
+            // 页号，页数是不能动的！
+            // 3. 解开桶锁
+            __span_lists[index].__bucket_mtx.unlock();
+            // 4. 还给pc
+            page_cache::get_instance()->__page_mtx.lock();
+            page_cache::get_instance()->release_span_to_page(cur_span);
+            page_cache::get_instance()->__page_mtx.unlock();
+            // 5. 恢复桶锁
+            __span_lists[index].__bucket_mtx.lock();
+        }
+        start = next;
+    }
+    __span_lists[index].__bucket_mtx.unlock();
+}
+```
+
+细节在注释里面写的很清楚了。
+
+要注意，调用pc的接口的时候，就记得把桶锁解掉。
+
+## page_cache内存释放
+
+就是这个函数。
+
+```cpp
+void page_cache::release_span_to_page(span* s) {
+    // 对span前后对页尝试进行合并，缓解内存碎片问题
+}
+```
+
+然后刚才的map可以帮助我们查找前后的page。
+
+然后我们前后找的时候，要区分这个页是不是在centralCache上的，如果在cc上，那就不能合并。
+
+然后这个判断不能用use_count==0这个判断条件。有可能这个span刚从pc拿过来，还没给别人的时候，use_count就是0，这个span，pc是不能回收合并的。
+
+所以可以给span添加一个参数is_use就行了。
+
+```cpp
+// 管理大块内存
+class span {
+public:
+    PAGE_ID __page_id; // 大块内存起始页的页号
+    size_t __n = 0; // 页的数量
+    // 双向链表结构
+    span* __next = nullptr;
+    span* __prev = nullptr;
+    size_t __use_count = 0; // 切成段小块内存，被分配给threadCache的计数器
+    void* __free_list = nullptr; // 切好的小块内存的自由链表
+    bool is_use = false; // 是否在被使用
+};
+```
+
+然后cc.cc这里改一下，拿到之后改成true就行。
+
+cc.cc
+```cpp
+    page_cache::get_instance()->__page_mtx.lock();
+    span* cur_span = page_cache::get_instance()->new_span(size_class::num_move_page(size));
+    cur_span->is_use = true; // 表示已经被使用
+    page_cache::get_instance()->__page_mtx.unlock();
+```
+
+
+然后继续写这个逻辑:
+
+page_cache.cc
+```cpp
+void page_cache::release_span_to_page(span* s) {
+    // 对span前后对页尝试进行合并，缓解内存碎片问题
+    PAGE_ID prev_id = s->__page_id - 1; // 前一块span的id一定是当前span的id-1
+    // 拿到id如何找span: 之前写好的map能拿到吗？
+}
+```
+
+现在的问题是，之前的map能拿到吗？还拿不到，因为我们之前的map只记录了分给cc的span的映射，没有存留在pc那些，没有分出去的映射。
+所以我们要在`span* page_cache::new_span(size_t k) {`里面添加一下，留在pagecache那些块的映射。
+
+```cpp
+            // 存储n_span的首尾页号跟n_span的映射，方便pc回收内存时进行合并查找
+            __id_span_map[n_span->__page_id] = n_span;
+            __id_span_map[n_span->__page_id + n_span->__n - 1] = n_span;
+```
+
+为什么这里不用循环存储呢？
+
+因为这里的pc的内存只是被span挂起来啊，不会被切啊，所以知道地址就了啊！
+给cc的那些，会被切开变成很多固定大小的内存块啊！所以这里不用循环存。
+
+## 大于256k的情况
+
+1. <=256kb -> 按照前面三层缓存的情况进行操作
+2. \>256kb的情况
+   a. 128\*8k > size > 32\*8k这个情况: 还可以找pagecache
+   b. 否则直接找系统
+
+然后这一部分就是有多处要改，不过都很简单很容易找到，大家可以直接看代码。处理完之后，测试一下申请大内存就行。
+
+
+## 处理代码中`new`的问题
+
+代码中有些地方用了`new span`。这个就很不对。我们弄这个tcmalloc是用来替代malloc的，既然是替代，那我们的代码里面怎么能有`new`，`new`也是调用`malloc`的，所以我们要改一下。

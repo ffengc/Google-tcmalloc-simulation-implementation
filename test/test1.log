@@ -1,0 +1,1223 @@
+# 测试: 申请1024次6字节
+    6字节对齐成8字节。如果第1025次申请，就会找新的span
+    预期：log中只有两个goto os for mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][src/thread_cache.cc][16] thread_cache::allocate call thread_cache::fetch_from_central_cache
+[DEBUG][src/thread_cache.cc][43] thread_cache::fetch_from_central_cache call  central_cache::get_instance()->fetch_range_obj()
+[DEBUG][src/central_cache.cc][12] central_cache::fetch_range_obj() call central_cache::get_non_empty_span()
+[DEBUG][src/central_cache.cc][45] central_cache::get_non_empty_span() cannot find non-null span in cc, goto pc for mem
+[DEBUG][src/central_cache.cc][52] central_cache::get_non_empty_span() call page_cache::get_instance()->new_span()
+[DEBUG][src/page_cache.cc][43] page_cache::new_span() cannot find span, goto os for mem
+[DEBUG][src/page_cache.cc][37] page_cache::new_span() have span, return
+[DEBUG][src/central_cache.cc][58] central_cache::get_non_empty_span() get new span success
+[DEBUG][src/central_cache.cc][70] central_cache::get_non_empty_span() cut span
+[DEBUG][src/thread_cache.cc][47] actual_n:1
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][src/thread_cache.cc][16] thread_cache::allocate call thread_cache::fetch_from_central_cache
+[DEBUG][src/thread_cache.cc][43] thread_cache::fetch_from_central_cache call  central_cache::get_instance()->fetch_range_obj()
+[DEBUG][src/central_cache.cc][12] central_cache::fetch_range_obj() call central_cache::get_non_empty_span()
+[DEBUG][src/thread_cache.cc][47] actual_n:2
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][src/thread_cache.cc][16] thread_cache::allocate call thread_cache::fetch_from_central_cache
+[DEBUG][src/thread_cache.cc][43] thread_cache::fetch_from_central_cache call  central_cache::get_instance()->fetch_range_obj()
+[DEBUG][src/central_cache.cc][12] central_cache::fetch_range_obj() call central_cache::get_non_empty_span()
+[DEBUG][src/thread_cache.cc][47] actual_n:3
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][src/thread_cache.cc][16] thread_cache::allocate call thread_cache::fetch_from_central_cache
+[DEBUG][src/thread_cache.cc][43] thread_cache::fetch_from_central_cache call  central_cache::get_instance()->fetch_range_obj()
+[DEBUG][src/central_cache.cc][12] central_cache::fetch_range_obj() call central_cache::get_non_empty_span()
+[DEBUG][src/thread_cache.cc][47] actual_n:4
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][src/thread_cache.cc][16] thread_cache::allocate call thread_cache::fetch_from_central_cache
+[DEBUG][src/thread_cache.cc][43] thread_cache::fetch_from_central_cache call  central_cache::get_instance()->fetch_range_obj()
+[DEBUG][src/central_cache.cc][12] central_cache::fetch_range_obj() call central_cache::get_non_empty_span()
+[DEBUG][src/thread_cache.cc][47] actual_n:5
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][src/thread_cache.cc][16] thread_cache::allocate call thread_cache::fetch_from_central_cache
+[DEBUG][src/thread_cache.cc][43] thread_cache::fetch_from_central_cache call  central_cache::get_instance()->fetch_range_obj()
+[DEBUG][src/central_cache.cc][12] central_cache::fetch_range_obj() call central_cache::get_non_empty_span()
+[DEBUG][src/thread_cache.cc][47] actual_n:6
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][src/thread_cache.cc][16] thread_cache::allocate call thread_cache::fetch_from_central_cache
+[DEBUG][src/thread_cache.cc][43] thread_cache::fetch_from_central_cache call  central_cache::get_instance()->fetch_range_obj()
+[DEBUG][src/central_cache.cc][12] central_cache::fetch_range_obj() call central_cache::get_non_empty_span()
+[DEBUG][src/thread_cache.cc][47] actual_n:7
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][src/thread_cache.cc][16] thread_cache::allocate call thread_cache::fetch_from_central_cache
+[DEBUG][src/thread_cache.cc][43] thread_cache::fetch_from_central_cache call  central_cache::get_instance()->fetch_range_obj()
+[DEBUG][src/central_cache.cc][12] central_cache::fetch_range_obj() call central_cache::get_non_empty_span()
+[DEBUG][src/thread_cache.cc][47] actual_n:8
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][src/thread_cache.cc][16] thread_cache::allocate call thread_cache::fetch_from_central_cache
+[DEBUG][src/thread_cache.cc][43] thread_cache::fetch_from_central_cache call  central_cache::get_instance()->fetch_range_obj()
+[DEBUG][src/central_cache.cc][12] central_cache::fetch_range_obj() call central_cache::get_non_empty_span()
+[DEBUG][src/thread_cache.cc][47] actual_n:9
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][src/thread_cache.cc][16] thread_cache::allocate call thread_cache::fetch_from_central_cache
+[DEBUG][src/thread_cache.cc][43] thread_cache::fetch_from_central_cache call  central_cache::get_instance()->fetch_range_obj()
+[DEBUG][src/central_cache.cc][12] central_cache::fetch_range_obj() call central_cache::get_non_empty_span()
+[DEBUG][src/thread_cache.cc][47] actual_n:10
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][src/thread_cache.cc][16] thread_cache::allocate call thread_cache::fetch_from_central_cache
+[DEBUG][src/thread_cache.cc][43] thread_cache::fetch_from_central_cache call  central_cache::get_instance()->fetch_range_obj()
+[DEBUG][src/central_cache.cc][12] central_cache::fetch_range_obj() call central_cache::get_non_empty_span()
+[DEBUG][src/thread_cache.cc][47] actual_n:11
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][src/thread_cache.cc][16] thread_cache::allocate call thread_cache::fetch_from_central_cache
+[DEBUG][src/thread_cache.cc][43] thread_cache::fetch_from_central_cache call  central_cache::get_instance()->fetch_range_obj()
+[DEBUG][src/central_cache.cc][12] central_cache::fetch_range_obj() call central_cache::get_non_empty_span()
+[DEBUG][src/thread_cache.cc][47] actual_n:12
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][src/thread_cache.cc][16] thread_cache::allocate call thread_cache::fetch_from_central_cache
+[DEBUG][src/thread_cache.cc][43] thread_cache::fetch_from_central_cache call  central_cache::get_instance()->fetch_range_obj()
+[DEBUG][src/central_cache.cc][12] central_cache::fetch_range_obj() call central_cache::get_non_empty_span()
+[DEBUG][src/thread_cache.cc][47] actual_n:13
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][src/thread_cache.cc][16] thread_cache::allocate call thread_cache::fetch_from_central_cache
+[DEBUG][src/thread_cache.cc][43] thread_cache::fetch_from_central_cache call  central_cache::get_instance()->fetch_range_obj()
+[DEBUG][src/central_cache.cc][12] central_cache::fetch_range_obj() call central_cache::get_non_empty_span()
+[DEBUG][src/thread_cache.cc][47] actual_n:14
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][src/thread_cache.cc][16] thread_cache::allocate call thread_cache::fetch_from_central_cache
+[DEBUG][src/thread_cache.cc][43] thread_cache::fetch_from_central_cache call  central_cache::get_instance()->fetch_range_obj()
+[DEBUG][src/central_cache.cc][12] central_cache::fetch_range_obj() call central_cache::get_non_empty_span()
+[DEBUG][src/thread_cache.cc][47] actual_n:15
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][src/thread_cache.cc][16] thread_cache::allocate call thread_cache::fetch_from_central_cache
+[DEBUG][src/thread_cache.cc][43] thread_cache::fetch_from_central_cache call  central_cache::get_instance()->fetch_range_obj()
+[DEBUG][src/central_cache.cc][12] central_cache::fetch_range_obj() call central_cache::get_non_empty_span()
+[DEBUG][src/thread_cache.cc][47] actual_n:16
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][src/thread_cache.cc][16] thread_cache::allocate call thread_cache::fetch_from_central_cache
+[DEBUG][src/thread_cache.cc][43] thread_cache::fetch_from_central_cache call  central_cache::get_instance()->fetch_range_obj()
+[DEBUG][src/central_cache.cc][12] central_cache::fetch_range_obj() call central_cache::get_non_empty_span()
+[DEBUG][src/thread_cache.cc][47] actual_n:17
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][src/thread_cache.cc][16] thread_cache::allocate call thread_cache::fetch_from_central_cache
+[DEBUG][src/thread_cache.cc][43] thread_cache::fetch_from_central_cache call  central_cache::get_instance()->fetch_range_obj()
+[DEBUG][src/central_cache.cc][12] central_cache::fetch_range_obj() call central_cache::get_non_empty_span()
+[DEBUG][src/thread_cache.cc][47] actual_n:18
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][src/thread_cache.cc][16] thread_cache::allocate call thread_cache::fetch_from_central_cache
+[DEBUG][src/thread_cache.cc][43] thread_cache::fetch_from_central_cache call  central_cache::get_instance()->fetch_range_obj()
+[DEBUG][src/central_cache.cc][12] central_cache::fetch_range_obj() call central_cache::get_non_empty_span()
+[DEBUG][src/thread_cache.cc][47] actual_n:19
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][src/thread_cache.cc][16] thread_cache::allocate call thread_cache::fetch_from_central_cache
+[DEBUG][src/thread_cache.cc][43] thread_cache::fetch_from_central_cache call  central_cache::get_instance()->fetch_range_obj()
+[DEBUG][src/central_cache.cc][12] central_cache::fetch_range_obj() call central_cache::get_non_empty_span()
+[DEBUG][src/thread_cache.cc][47] actual_n:20
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][src/thread_cache.cc][16] thread_cache::allocate call thread_cache::fetch_from_central_cache
+[DEBUG][src/thread_cache.cc][43] thread_cache::fetch_from_central_cache call  central_cache::get_instance()->fetch_range_obj()
+[DEBUG][src/central_cache.cc][12] central_cache::fetch_range_obj() call central_cache::get_non_empty_span()
+[DEBUG][src/thread_cache.cc][47] actual_n:21
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][src/thread_cache.cc][16] thread_cache::allocate call thread_cache::fetch_from_central_cache
+[DEBUG][src/thread_cache.cc][43] thread_cache::fetch_from_central_cache call  central_cache::get_instance()->fetch_range_obj()
+[DEBUG][src/central_cache.cc][12] central_cache::fetch_range_obj() call central_cache::get_non_empty_span()
+[DEBUG][src/thread_cache.cc][47] actual_n:22
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][src/thread_cache.cc][16] thread_cache::allocate call thread_cache::fetch_from_central_cache
+[DEBUG][src/thread_cache.cc][43] thread_cache::fetch_from_central_cache call  central_cache::get_instance()->fetch_range_obj()
+[DEBUG][src/central_cache.cc][12] central_cache::fetch_range_obj() call central_cache::get_non_empty_span()
+[DEBUG][src/thread_cache.cc][47] actual_n:23
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][src/thread_cache.cc][16] thread_cache::allocate call thread_cache::fetch_from_central_cache
+[DEBUG][src/thread_cache.cc][43] thread_cache::fetch_from_central_cache call  central_cache::get_instance()->fetch_range_obj()
+[DEBUG][src/central_cache.cc][12] central_cache::fetch_range_obj() call central_cache::get_non_empty_span()
+[DEBUG][src/thread_cache.cc][47] actual_n:24
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][src/thread_cache.cc][16] thread_cache::allocate call thread_cache::fetch_from_central_cache
+[DEBUG][src/thread_cache.cc][43] thread_cache::fetch_from_central_cache call  central_cache::get_instance()->fetch_range_obj()
+[DEBUG][src/central_cache.cc][12] central_cache::fetch_range_obj() call central_cache::get_non_empty_span()
+[DEBUG][src/thread_cache.cc][47] actual_n:25
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][src/thread_cache.cc][16] thread_cache::allocate call thread_cache::fetch_from_central_cache
+[DEBUG][src/thread_cache.cc][43] thread_cache::fetch_from_central_cache call  central_cache::get_instance()->fetch_range_obj()
+[DEBUG][src/central_cache.cc][12] central_cache::fetch_range_obj() call central_cache::get_non_empty_span()
+[DEBUG][src/thread_cache.cc][47] actual_n:26
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][src/thread_cache.cc][16] thread_cache::allocate call thread_cache::fetch_from_central_cache
+[DEBUG][src/thread_cache.cc][43] thread_cache::fetch_from_central_cache call  central_cache::get_instance()->fetch_range_obj()
+[DEBUG][src/central_cache.cc][12] central_cache::fetch_range_obj() call central_cache::get_non_empty_span()
+[DEBUG][src/thread_cache.cc][47] actual_n:27
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][src/thread_cache.cc][16] thread_cache::allocate call thread_cache::fetch_from_central_cache
+[DEBUG][src/thread_cache.cc][43] thread_cache::fetch_from_central_cache call  central_cache::get_instance()->fetch_range_obj()
+[DEBUG][src/central_cache.cc][12] central_cache::fetch_range_obj() call central_cache::get_non_empty_span()
+[DEBUG][src/thread_cache.cc][47] actual_n:28
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][src/thread_cache.cc][16] thread_cache::allocate call thread_cache::fetch_from_central_cache
+[DEBUG][src/thread_cache.cc][43] thread_cache::fetch_from_central_cache call  central_cache::get_instance()->fetch_range_obj()
+[DEBUG][src/central_cache.cc][12] central_cache::fetch_range_obj() call central_cache::get_non_empty_span()
+[DEBUG][src/thread_cache.cc][47] actual_n:29
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][src/thread_cache.cc][16] thread_cache::allocate call thread_cache::fetch_from_central_cache
+[DEBUG][src/thread_cache.cc][43] thread_cache::fetch_from_central_cache call  central_cache::get_instance()->fetch_range_obj()
+[DEBUG][src/central_cache.cc][12] central_cache::fetch_range_obj() call central_cache::get_non_empty_span()
+[DEBUG][src/thread_cache.cc][47] actual_n:30
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][src/thread_cache.cc][16] thread_cache::allocate call thread_cache::fetch_from_central_cache
+[DEBUG][src/thread_cache.cc][43] thread_cache::fetch_from_central_cache call  central_cache::get_instance()->fetch_range_obj()
+[DEBUG][src/central_cache.cc][12] central_cache::fetch_range_obj() call central_cache::get_non_empty_span()
+[DEBUG][src/thread_cache.cc][47] actual_n:31
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][src/thread_cache.cc][16] thread_cache::allocate call thread_cache::fetch_from_central_cache
+[DEBUG][src/thread_cache.cc][43] thread_cache::fetch_from_central_cache call  central_cache::get_instance()->fetch_range_obj()
+[DEBUG][src/central_cache.cc][12] central_cache::fetch_range_obj() call central_cache::get_non_empty_span()
+[DEBUG][src/thread_cache.cc][47] actual_n:32
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][src/thread_cache.cc][16] thread_cache::allocate call thread_cache::fetch_from_central_cache
+[DEBUG][src/thread_cache.cc][43] thread_cache::fetch_from_central_cache call  central_cache::get_instance()->fetch_range_obj()
+[DEBUG][src/central_cache.cc][12] central_cache::fetch_range_obj() call central_cache::get_non_empty_span()
+[DEBUG][src/thread_cache.cc][47] actual_n:33
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][src/thread_cache.cc][16] thread_cache::allocate call thread_cache::fetch_from_central_cache
+[DEBUG][src/thread_cache.cc][43] thread_cache::fetch_from_central_cache call  central_cache::get_instance()->fetch_range_obj()
+[DEBUG][src/central_cache.cc][12] central_cache::fetch_range_obj() call central_cache::get_non_empty_span()
+[DEBUG][src/thread_cache.cc][47] actual_n:34
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][src/thread_cache.cc][16] thread_cache::allocate call thread_cache::fetch_from_central_cache
+[DEBUG][src/thread_cache.cc][43] thread_cache::fetch_from_central_cache call  central_cache::get_instance()->fetch_range_obj()
+[DEBUG][src/central_cache.cc][12] central_cache::fetch_range_obj() call central_cache::get_non_empty_span()
+[DEBUG][src/thread_cache.cc][47] actual_n:35
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][src/thread_cache.cc][16] thread_cache::allocate call thread_cache::fetch_from_central_cache
+[DEBUG][src/thread_cache.cc][43] thread_cache::fetch_from_central_cache call  central_cache::get_instance()->fetch_range_obj()
+[DEBUG][src/central_cache.cc][12] central_cache::fetch_range_obj() call central_cache::get_non_empty_span()
+[DEBUG][src/thread_cache.cc][47] actual_n:36
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][src/thread_cache.cc][16] thread_cache::allocate call thread_cache::fetch_from_central_cache
+[DEBUG][src/thread_cache.cc][43] thread_cache::fetch_from_central_cache call  central_cache::get_instance()->fetch_range_obj()
+[DEBUG][src/central_cache.cc][12] central_cache::fetch_range_obj() call central_cache::get_non_empty_span()
+[DEBUG][src/thread_cache.cc][47] actual_n:37
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][src/thread_cache.cc][16] thread_cache::allocate call thread_cache::fetch_from_central_cache
+[DEBUG][src/thread_cache.cc][43] thread_cache::fetch_from_central_cache call  central_cache::get_instance()->fetch_range_obj()
+[DEBUG][src/central_cache.cc][12] central_cache::fetch_range_obj() call central_cache::get_non_empty_span()
+[DEBUG][src/thread_cache.cc][47] actual_n:38
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][src/thread_cache.cc][16] thread_cache::allocate call thread_cache::fetch_from_central_cache
+[DEBUG][src/thread_cache.cc][43] thread_cache::fetch_from_central_cache call  central_cache::get_instance()->fetch_range_obj()
+[DEBUG][src/central_cache.cc][12] central_cache::fetch_range_obj() call central_cache::get_non_empty_span()
+[DEBUG][src/thread_cache.cc][47] actual_n:39
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][src/thread_cache.cc][16] thread_cache::allocate call thread_cache::fetch_from_central_cache
+[DEBUG][src/thread_cache.cc][43] thread_cache::fetch_from_central_cache call  central_cache::get_instance()->fetch_range_obj()
+[DEBUG][src/central_cache.cc][12] central_cache::fetch_range_obj() call central_cache::get_non_empty_span()
+[DEBUG][src/thread_cache.cc][47] actual_n:40
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][src/thread_cache.cc][16] thread_cache::allocate call thread_cache::fetch_from_central_cache
+[DEBUG][src/thread_cache.cc][43] thread_cache::fetch_from_central_cache call  central_cache::get_instance()->fetch_range_obj()
+[DEBUG][src/central_cache.cc][12] central_cache::fetch_range_obj() call central_cache::get_non_empty_span()
+[DEBUG][src/thread_cache.cc][47] actual_n:41
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][src/thread_cache.cc][16] thread_cache::allocate call thread_cache::fetch_from_central_cache
+[DEBUG][src/thread_cache.cc][43] thread_cache::fetch_from_central_cache call  central_cache::get_instance()->fetch_range_obj()
+[DEBUG][src/central_cache.cc][12] central_cache::fetch_range_obj() call central_cache::get_non_empty_span()
+[DEBUG][src/thread_cache.cc][47] actual_n:42
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][src/thread_cache.cc][16] thread_cache::allocate call thread_cache::fetch_from_central_cache
+[DEBUG][src/thread_cache.cc][43] thread_cache::fetch_from_central_cache call  central_cache::get_instance()->fetch_range_obj()
+[DEBUG][src/central_cache.cc][12] central_cache::fetch_range_obj() call central_cache::get_non_empty_span()
+[DEBUG][src/thread_cache.cc][47] actual_n:43
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][src/thread_cache.cc][16] thread_cache::allocate call thread_cache::fetch_from_central_cache
+[DEBUG][src/thread_cache.cc][43] thread_cache::fetch_from_central_cache call  central_cache::get_instance()->fetch_range_obj()
+[DEBUG][src/central_cache.cc][12] central_cache::fetch_range_obj() call central_cache::get_non_empty_span()
+[DEBUG][src/thread_cache.cc][47] actual_n:44
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][src/thread_cache.cc][16] thread_cache::allocate call thread_cache::fetch_from_central_cache
+[DEBUG][src/thread_cache.cc][43] thread_cache::fetch_from_central_cache call  central_cache::get_instance()->fetch_range_obj()
+[DEBUG][src/central_cache.cc][12] central_cache::fetch_range_obj() call central_cache::get_non_empty_span()
+[DEBUG][src/thread_cache.cc][47] actual_n:34
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
+[DEBUG][src/thread_cache.cc][16] thread_cache::allocate call thread_cache::fetch_from_central_cache
+[DEBUG][src/thread_cache.cc][43] thread_cache::fetch_from_central_cache call  central_cache::get_instance()->fetch_range_obj()
+[DEBUG][src/central_cache.cc][12] central_cache::fetch_range_obj() call central_cache::get_non_empty_span()
+[DEBUG][src/central_cache.cc][45] central_cache::get_non_empty_span() cannot find non-null span in cc, goto pc for mem
+[DEBUG][src/central_cache.cc][52] central_cache::get_non_empty_span() call page_cache::get_instance()->new_span()
+[DEBUG][src/page_cache.cc][37] page_cache::new_span() have span, return
+[DEBUG][src/central_cache.cc][58] central_cache::get_non_empty_span() get new span success
+[DEBUG][src/central_cache.cc][70] central_cache::get_non_empty_span() cut span
+[DEBUG][src/thread_cache.cc][47] actual_n:46

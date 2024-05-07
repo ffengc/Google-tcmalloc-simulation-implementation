@@ -1,5 +1,7 @@
-test: *.cc ./src/*.cc
+out: *.cc ./src/*.cc
 	g++ -o $@ $^ -std=c++11 -lpthread
+debug: *.cc ./src/*.cc
+	g++ -o $@ $^ -std=c++11 -lpthread -DPROJECT_DEBUG
 .PHONY:clean
 clean:
-	rm -f test
+	rm -f out debug

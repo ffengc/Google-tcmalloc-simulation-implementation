@@ -6,6 +6,20 @@
 #include <algorithm>
 #include <assert.h>
 #include <mutex>
+#include <unordered_map>
+
+#ifdef PROJECT_DEBUG
+#include "log.hpp"
+#include <iostream>
+#endif
+
+#if defined(_WIN32) || defined(_WIN64)
+#include <windows.h>
+#elif defined(__aarch64__) // ...
+#include <sys/mman.h>
+#else
+#include <iostream>
+#endif
 
 static const size_t MAX_BYTES = 256 * 1024; // 256kb
 static const size_t BUCKETS_NUM = 208; // 一共208个桶
@@ -21,14 +35,11 @@ typedef size_t PAGE_ID;
 inline static void* system_alloc(size_t kpage) {
     void* ptr = nullptr;
 #if defined(_WIN32) || defined(_WIN64)
-#include <windows.h>
-    *ptr = VirtualAlloc(0, kpage * (1 << 12), MEM_COMMIT | MEM_RESERVE,
+    ptr = VirtualAlloc(0, kpage << 13, MEM_COMMIT | MEM_RESERVE,
         PAGE_READWRITE);
 #elif defined(__aarch64__) // ...
-#include <sys/mman.h>
-    void* ptr = mmap(NULL, kpage << 13, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
+    ptr = mmap(NULL, kpage << 13, PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 #else
-#include <iostream>
     std::cerr << "unknown system" << std::endl;
     throw std::bad_alloc();
 #endif
@@ -37,30 +48,60 @@ inline static void* system_alloc(size_t kpage) {
     return ptr;
 }
 
+inline static void system_free(void* ptr, size_t size = 0) {
+    /**
+     * linux的munmap需要给大小
+     */
+#if defined(_WIN32) || defined(_WIN64)
+    VirtualFree(ptr, 0, MEM_RELEASE);
+#elif defined(__linux__) // ...
+    munmap(ptr, size);
+#endif
+}
+
 // 管理切分好的小对象的自由链表
 class free_list {
 private:
     void* __free_list_ptr = nullptr;
     size_t __max_size = 1;
+    size_t __size = 0;
 
 public:
     void push(void* obj) {
         assert(obj);
         __next_obj(obj) = __free_list_ptr;
         __free_list_ptr = obj;
+        ++__size;
     }
-    void push(void* start, void* end) {
+    void push(void* start, void* end, size_t n) {
         __next_obj(end) = __free_list_ptr;
         __free_list_ptr = start;
+        __size += n;
     }
     void* pop() {
         assert(__free_list_ptr);
         void* obj = __free_list_ptr;
         __free_list_ptr = __next_obj(obj);
+        --__size;
         return obj;
+    }
+    void pop(void*& start, void*& end, size_t n) {
+// 这里是输出参数了
+#ifdef PROJECT_DEBUG
+        LOG(DEBUG) << "call here" << std::endl;
+#endif
+        assert(n <= __size);
+        start = __free_list_ptr;
+        end = start; // debug 20240507 miss this
+        for (size_t i = 0; i < n - 1; i++)
+            end = free_list::__next_obj(end);
+        __free_list_ptr = free_list::__next_obj(end);
+        free_list::__next_obj(end) = nullptr;
+        __size -= n;
     }
     bool empty() { return __free_list_ptr == nullptr; }
     size_t& max_size() { return __max_size; }
+    size_t size() { return __size; }
 
 public:
     static void*& __next_obj(void* obj) {
@@ -86,8 +127,8 @@ public:
         else if (size <= 256 * 1024)
             return __round_up(size, 8 * 1024);
         else {
-            assert(false);
-            return -1;
+            // 大内存
+            return __round_up(size, 1 << PAGE_SHIFT);
         }
     }
     // 计算映射的哪一个自由链表桶
@@ -157,6 +198,7 @@ public:
     span* __prev = nullptr;
     size_t __use_count = 0; // 切成段小块内存，被分配给threadCache的计数器
     void* __free_list = nullptr; // 切好的小块内存的自由链表
+    bool __is_use = false; // 是否在被使用
 };
 
 // 带头双向循环链表

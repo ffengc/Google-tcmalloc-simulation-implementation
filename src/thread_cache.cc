@@ -2,6 +2,7 @@
 
 #include "../include/thread_cache.hpp"
 #include "../include/central_cache.hpp"
+#include "../include/log.hpp"
 
 void* thread_cache::allocate(size_t size) {
     assert(size <= MAX_BYTES);
@@ -11,16 +12,11 @@ void* thread_cache::allocate(size_t size) {
         return __free_lists[bucket_index].pop();
     } else {
         // 这个桶下面没有内存了！找centralCache找
+#ifdef PROJECT_DEBUG
+        LOG(DEBUG) << "thread_cache::allocate call thread_cache::fetch_from_central_cache" << std::endl;
+#endif
         return fetch_from_central_cache(bucket_index, align_size);
     }
-}
-
-void thread_cache::deallocate(void* ptr, size_t size) {
-    assert(ptr);
-    assert(size <= MAX_BYTES);
-    size_t index = size_class::bucket_index(size);
-    __free_lists[index].push(ptr);
-    // ... 如果太长了，还给centralCache
 }
 
 void* thread_cache::fetch_from_central_cache(size_t index, size_t size) {
@@ -35,15 +31,47 @@ void* thread_cache::fetch_from_central_cache(size_t index, size_t size) {
     // 开始获取内存了
     void* start = nullptr;
     void* end = nullptr;
+#ifdef PROJECT_DEBUG
+    LOG(DEBUG) << "thread_cache::fetch_from_central_cache call  central_cache::get_instance()->fetch_range_obj()" << std::endl;
+#endif
     size_t actual_n = central_cache::get_instance()->fetch_range_obj(start, end, batch_num, size);
-    assert(actual_n > 1);
+#ifdef PROJECT_DEBUG
+    LOG(DEBUG) << "actual_n"
+               << ":" << actual_n << std::endl;
+#endif
+    assert(actual_n >= 1);
     if (actual_n == 1) {
         assert(start == end);
         return start;
     } else {
-        __free_lists[index].push(free_list::__next_obj(start), end);
+        __free_lists[index].push(free_list::__next_obj(start), end, actual_n - 1);
         return start;
     }
 
     return nullptr;
+}
+
+void thread_cache::deallocate(void* ptr, size_t size) {
+    assert(ptr);
+    assert(size <= MAX_BYTES);
+    size_t index = size_class::bucket_index(size);
+    __free_lists[index].push(ptr);
+    // 当链表长度大于一次批量申请的内存的时候，就开始还一段list给cc
+    if (__free_lists[index].size() >= __free_lists[index].max_size()) {
+#ifdef PROJECT_DEBUG
+        LOG(DEBUG) << __free_lists[index].size() << ":" << __free_lists[index].max_size() << std::endl;
+        LOG(DEBUG) << "call list_too_long" << std::endl;
+#endif
+        list_too_long(__free_lists[index], size);
+    }
+}
+
+void thread_cache::list_too_long(free_list& list, size_t size) {
+    void* start = nullptr;
+    void* end = nullptr;
+    list.pop(start, end, list.max_size());
+    #ifdef PROJECT_DEBUG
+    LOG(DEBUG) << "list pop success -> call release_list_to_spans()" << std::endl;
+    #endif
+    central_cache::get_instance()->release_list_to_spans(start, size);
 }
