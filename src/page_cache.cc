@@ -6,29 +6,39 @@ page_cache page_cache::__s_inst;
 
 // cc向pc获取k页的span
 span* page_cache::new_span(size_t k) {
-    assert(k > 0 && k < PAGES_NUM);
+    assert(k > 0);
+    // 处理大内存情况
+    if (k > PAGES_NUM - 1) {
+        void* ptr = system_alloc(k);
+        span* cur_span = new span;
+        cur_span->__page_id = (PAGE_ID)ptr >> PAGE_SHIFT;
+        cur_span->__n = k;
+        // map记录一下
+        __id_span_map[cur_span->__page_id] = cur_span;
+        return cur_span;
+    }
     // 先检查第k个桶是否有span
     // #ifdef PROJECT_DEBUG
     //     LOG(DEBUG) << "before ***" << std::endl;
     // #endif
-    if (!__span_lists[k].empty())
-        return __span_lists[k].pop_front(); // ? __span_lists->pop_front();
+    if (!__span_lists[k].empty()) {
+        span* s = __span_lists[k].pop_front(); // ? __span_lists->pop_front();
+        // 建立id和span的映射，方便central cache回收小块内存时，查找对应的span
+        for (PAGE_ID i = 0; i < s->__n; ++i) {
+            __id_span_map[s->__page_id + i] = s;
+        }
+        return s;
+    }
     // #ifdef PROJECT_DEBUG
     //     LOG(DEBUG) << "after ***" << std::endl;
     // #endif
     // 第k个桶是空的->去检查后面的桶里面有无span，如果有，可以把它进行切分
     for (size_t i = k + 1; i < PAGES_NUM; i++) {
         if (!__span_lists[i].empty()) {
-// 可以开始切了
-// 假设这个页是n页的，需要的是k页的
-// 1. 从__span_lists中拿下来 2. 切开 3. 一个返回给cc 4. 另一个挂到 n-k 号桶里面去
-#ifdef PROJECT_DEBUG
-            LOG(DEBUG) << "before ***" << std::endl;
-#endif
+            // 可以开始切了
+            // 假设这个页是n页的，需要的是k页的
+            // 1. 从__span_lists中拿下来 2. 切开 3. 一个返回给cc 4. 另一个挂到 n-k 号桶里面去
             span* n_span = __span_lists[i].pop_front();
-#ifdef PROJECT_DEBUG
-            LOG(DEBUG) << "after ***" << std::endl;
-#endif
             span* k_span = new span;
             // 在n_span头部切除k页下来
             k_span->__page_id = n_span->__page_id; // <1>
@@ -82,7 +92,16 @@ span* page_cache::map_obj_to_span(void* obj) {
     return nullptr;
 }
 
-void page_cache::release_span_to_page(span* s) {
+void page_cache::release_span_to_page(span* s, size_t size) {
+    // 第二个参数是为了linux下一次释放大内存，需要大小
+    // std::cout << s->__n << std::endl; // 33
+    if (s->__n >= PAGES_NUM) {
+        // 处理大内存
+        void* ptr = (void*)(s->__page_id << PAGE_SHIFT);
+        system_free(s, size);
+        delete s;
+        return;
+    }
     // 对span前后对页尝试进行合并，缓解内存碎片问题
     while (true) {
         PAGE_ID prev_id = s->__page_id - 1; // 前一块span的id一定是当前span的id-1
@@ -103,7 +122,7 @@ void page_cache::release_span_to_page(span* s) {
         delete prev_span; // 删掉这个span
     } // 向前合并的逻辑 while end;
     while (true) {
-        PAGE_ID next_id = s->__page_id + s->__n - 1; // 注意这里的页号是+n-1了
+        PAGE_ID next_id = s->__page_id + s->__n; // 注意这里的页号是+n了
         auto ret = __id_span_map.find(next_id);
         if (ret == __id_span_map.end()) // 后面的页号没有了
             break;

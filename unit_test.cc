@@ -1,11 +1,11 @@
 
 
 #include "./include/tcmalloc.hpp"
+#include <functional>
 #include <iostream>
 #include <map>
 #include <random>
 #include <thread>
-#include <functional>
 
 void alloc1() {
     for (size_t i = 0; i < 5; i++) {
@@ -48,7 +48,7 @@ void test_dealloc(int alloc_times = 10) {
     // 创建随机数生成器
     std::random_device rd;
     std::mt19937 gen(rd()); // 以随机设备作为种子
-    std::uniform_int_distribution<> distrib(1, 127 * 1024); // 设置随机数分布范围1-127
+    std::uniform_int_distribution<> distrib(1, 127 * 100); // 设置随机数分布范围1-127
     // 生成并输出随机数
     std::map<void*, size_t> s;
     for (int i = 0; i < alloc_times; i++) {
@@ -61,14 +61,19 @@ void test_dealloc(int alloc_times = 10) {
 }
 
 void test_multi_thread() {
-    std::thread t1(std::bind(test_dealloc, 200));
+    std::thread t1(std::bind(test_dealloc, 1000));
     // std::thread t2(std::bind(test_dealloc, 20));
     t1.join();
     // t2.join();
     std::cout << "run successful" << std::endl;
 }
 
+void big_alloc() {
+    void* ptr = tcmalloc(8 * 127 * 1024);
+    tcfree(ptr, 8 * 127 * 1024);
+}
+
 int main() {
-    test_multi_thread();
+    big_alloc();
     return 0;
 }

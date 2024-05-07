@@ -48,6 +48,17 @@ inline static void* system_alloc(size_t kpage) {
     return ptr;
 }
 
+inline static void system_free(void* ptr, size_t size = 0) {
+    /**
+     * linux的munmap需要给大小
+     */
+#if defined(_WIN32) || defined(_WIN64)
+    VirtualFree(ptr, 0, MEM_RELEASE);
+#elif defined(__linux__) // ...
+    munmap(ptr, size);
+#endif
+}
+
 // 管理切分好的小对象的自由链表
 class free_list {
 private:
@@ -116,8 +127,8 @@ public:
         else if (size <= 256 * 1024)
             return __round_up(size, 8 * 1024);
         else {
-            assert(false);
-            return -1;
+            // 大内存
+            return __round_up(size, 1 << PAGE_SHIFT);
         }
     }
     // 计算映射的哪一个自由链表桶
