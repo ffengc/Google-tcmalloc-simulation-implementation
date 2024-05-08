@@ -22,6 +22,10 @@
   - [page\_cache内存释放](#page_cache内存释放)
   - [大于256k的情况](#大于256k的情况)
   - [处理代码中`new`的问题](#处理代码中new的问题)
+  - [解决free，使其不用传大小](#解决free使其不用传大小)
+  - [多线程场景下深度测试](#多线程场景下深度测试)
+  - [分析性能瓶颈](#分析性能瓶颈)
+  - [用Radix Tree进行优化](#用radix-tree进行优化)
 
 ***
 
@@ -1197,3 +1201,91 @@ void page_cache::release_span_to_page(span* s) {
 ## 处理代码中`new`的问题
 
 代码中有些地方用了`new span`。这个就很不对。我们弄这个tcmalloc是用来替代malloc的，既然是替代，那我们的代码里面怎么能有`new`，`new`也是调用`malloc`的，所以我们要改一下。
+
+然后之前是写了一个定长内存池的，可以用来代替new。
+
+**博客地址：[内存池是什么原理？｜内存池简易模拟实现｜为学习高并发内存池tcmalloc做准备](https://blog.csdn.net/Yu_Cblog/article/details/131741601)**
+
+page_cache.hpp
+```cpp
+class page_cache {
+private:
+    span_list __span_lists[PAGES_NUM];
+    static page_cache __s_inst;
+    page_cache() = default;
+    page_cache(const page_cache&) = delete;
+    std::unordered_map<PAGE_ID, span*> __id_span_map;
+    object_pool<span> __span_pool;
+```
+多加一个`object_pool<span> __span_pool;`对象。
+
+然后，`new span`的地方都替换掉。`delete`的地方也换掉就行。
+
+然后这里面也改一下。
+
+tcmalloc.hpp
+```cpp
+static void* tcmalloc(size_t size) {
+    if (size > MAX_BYTES) {
+        // 处理申请大内存的情况
+        size_t align_size = size_class::round_up(size);
+        size_t k_page = align_size >> PAGE_SHIFT;
+        page_cache::get_instance()->__page_mtx.lock();
+        span* cur_span = page_cache::get_instance()->new_span(k_page); // 直接找pc
+        page_cache::get_instance()->__page_mtx.unlock();
+        void* ptr = (void*)(cur_span->__page_id << PAGE_SHIFT); // span转化成地址
+        return ptr;
+    }
+    if (p_tls_thread_cache == nullptr) {
+        // 相当于单例
+        // p_tls_thread_cache = new thread_cache;
+        static object_pool<thread_cache> tc_pool;
+        p_tls_thread_cache = tc_pool.new_();
+    }
+#ifdef PROJECT_DEBUG
+    LOG(DEBUG) << "tcmalloc find tc from mem" << std::endl;
+#endif
+    return p_tls_thread_cache->allocate(size);
+}
+```
+
+## 解决free，使其不用传大小
+
+因为我们已经有页号到span的映射了。所以我们在span里面增加一个字段，obj_size就行。
+
+## 多线程场景下深度测试
+
+**首先要明确一点，我们不是去造一个轮子，我们要和malloc对比，不是说要比malloc快多少，因为我们在很多细节上，和tcmalloc差的还是很远的。**
+
+测试代码可以见bench\_mark.cc。
+
+结果
+```bash
+parallels@ubuntu-linux-22-04-desktop:~/Project/Google-tcmalloc-simulation-implementation$ ./out
+==========================================================
+4个线程并发执行10轮次，每轮次concurrent alloc 1000次: 花费：27877 ms
+4个线程并发执行10轮次，每轮次concurrent dealloc 1000次: 花费：52190 ms
+4个线程并发concurrent alloc&dealloc 40000次，总计花费：80067 ms
+
+
+4个线程并发执行10次，每轮次malloc 1000次: 花费：2227ms
+4个线程并发执行10轮次，每轮次free 1000次: 花费：1385 ms
+4个线程并发malloc&free 40000次，总计花费：3612 ms
+==========================================================
+parallels@ubuntu-linux-22-04-desktop:~/Project/Google-tcmalloc-simulation-implementation$
+```
+
+比malloc差。
+
+## 分析性能瓶颈
+
+linux和windows(VS STUDIO)下都有很多性能分析的工具，可以检测哪里调用的时间多。
+
+在这里直接出结论：锁用了很多时间。
+
+可以用基数树进行优化。
+
+## 用Radix Tree进行优化
+
+radix tree 我们可以直接用tcmalloc源码里面的。`page_map.hpp`。
+

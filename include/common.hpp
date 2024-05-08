@@ -28,8 +28,10 @@ static const size_t PAGE_SHIFT = 13;
 
 #if defined(_WIN64) || defined(__x86_64__) || defined(__ppc64__) || defined(__aarch64__)
 typedef unsigned long long PAGE_ID;
+#define SYS_BYTES 64
 #else
 typedef size_t PAGE_ID;
+#define SYS_BYTES 32
 #endif
 
 inline static void* system_alloc(size_t kpage) {
@@ -199,6 +201,7 @@ public:
     size_t __use_count = 0; // 切成段小块内存，被分配给threadCache的计数器
     void* __free_list = nullptr; // 切好的小块内存的自由链表
     bool __is_use = false; // 是否在被使用
+    size_t __obj_size; // 切好的小对象的大小
 };
 
 // 带头双向循环链表
