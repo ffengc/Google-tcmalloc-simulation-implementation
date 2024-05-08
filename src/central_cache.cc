@@ -54,6 +54,7 @@ span* central_cache::get_non_empty_span(span_list& list, size_t size) {
     page_cache::get_instance()->__page_mtx.lock();
     span* cur_span = page_cache::get_instance()->new_span(size_class::num_move_page(size));
     cur_span->__is_use = true; // 表示已经被使用
+    cur_span->__obj_size = size; 
     page_cache::get_instance()->__page_mtx.unlock();
 #ifdef PROJECT_DEBUG
     LOG(DEBUG) << "central_cache::get_non_empty_span() get new span success" << std::endl;
@@ -70,11 +71,15 @@ span* central_cache::get_non_empty_span(span_list& list, size_t size) {
 #ifdef PROJECT_DEBUG
     LOG(DEBUG) << "central_cache::get_non_empty_span() cut span" << std::endl;
 #endif
+    int i = 1;
     while (addr_start < addr_end) {
-        free_list::__next_obj(tail) = addr_start;
+        ++i;
+        free_list::__next_obj(tail) = addr_start; // tail不是空指针
+        // std::cerr << "here" << std::endl;
         tail = free_list::__next_obj(tail);
         addr_start += size;
     }
+    free_list::__next_obj(tail) = nullptr;
     // 恢复锁
     list.__bucket_mtx.lock();
     list.push_front(cur_span);

@@ -52,11 +52,14 @@ void test_dealloc(int alloc_times = 10) {
     // 生成并输出随机数
     std::map<void*, size_t> s;
     for (int i = 0; i < alloc_times; i++) {
-        int sz = distrib(gen);
-        s.insert({ tcmalloc(sz), sz }); // 申请随机值
+        size_t sz = distrib(gen);
+        std::cout << sz << std::endl;
+        void* ptr = tcmalloc(sz);
+        std::cout << "malloc successful" << std::endl;
+        s.insert({ ptr, sz }); // 申请随机值
     }
     for (auto& e : s) {
-        tcfree(e.first, e.second);
+        tcfree(e.first /*, e.second*/);
     }
 }
 
@@ -68,12 +71,26 @@ void test_multi_thread() {
     std::cout << "run successful" << std::endl;
 }
 
+void run() {
+    void* ptr = tcmalloc(5949);
+    tcfree(ptr);
+    std::cout << "run successful" << std::endl;
+}
+
 void big_alloc() {
-    void* ptr = tcmalloc(8 * 127 * 1024);
-    tcfree(ptr, 8 * 127 * 1024);
+    std::thread t1(run);
+    t1.join();
 }
 
 int main() {
-    big_alloc();
+// std::cout << "haha" << std::endl;
+// big_alloc();
+#ifdef __aarch64__
+    std::cout << "64" << std::endl;
+#elif defined(__arm__)
+    std::cout << "32" << std::endl;
+#else
+    std::cout << "unknown sys" << std::endl;
+#endif
     return 0;
 }

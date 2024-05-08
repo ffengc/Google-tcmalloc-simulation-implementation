@@ -4,6 +4,7 @@
 
 #include "common.hpp"
 #include "log.hpp"
+#include "object_pool.hpp"
 #include "page_cache.hpp"
 #include "thread_cache.hpp"
 
@@ -14,20 +15,26 @@ static void* tcmalloc(size_t size) {
         size_t k_page = align_size >> PAGE_SHIFT;
         page_cache::get_instance()->__page_mtx.lock();
         span* cur_span = page_cache::get_instance()->new_span(k_page); // 直接找pc
+        cur_span->__obj_size = size;
         page_cache::get_instance()->__page_mtx.unlock();
         void* ptr = (void*)(cur_span->__page_id << PAGE_SHIFT); // span转化成地址
         return ptr;
     }
-    if (p_tls_thread_cache == nullptr)
+    if (p_tls_thread_cache == nullptr) {
         // 相当于单例
-        p_tls_thread_cache = new thread_cache;
+        // p_tls_thread_cache = new thread_cache;
+        static object_pool<thread_cache> tc_pool;
+        p_tls_thread_cache = tc_pool.new_();
+    }
 #ifdef PROJECT_DEBUG
     LOG(DEBUG) << "tcmalloc find tc from mem" << std::endl;
 #endif
     return p_tls_thread_cache->allocate(size);
 }
 
-static void tcfree(void* ptr, size_t size) {
+static void tcfree(void* ptr) {
+    span* s = page_cache::get_instance()->map_obj_to_span(ptr); // 找到这个span就能找到obj_size了
+    size_t size = s->__obj_size; // 找到大小了
     if (size > MAX_BYTES) {
         span* s = page_cache::get_instance()->map_obj_to_span(ptr); // 找到这个span
         page_cache::get_instance()->__page_mtx.lock();
