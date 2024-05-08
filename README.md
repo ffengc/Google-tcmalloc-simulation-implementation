@@ -1,9 +1,10 @@
-# Google-tcmalloc-simulation-implementation
+# Google-tcmalloc-simulation-implementation(未完成)
 谷歌开源项目tcmalloc高并发内存池学习和模拟实现
 
 开题日期：20240504
 
-- [Google-tcmalloc-simulation-implementation](#google-tcmalloc-simulation-implementation)
+- [Google-tcmalloc-simulation-implementation(未完成)](#google-tcmalloc-simulation-implementation未完成)
+  - [==bugs to fix (项目目前待解决的问题)==](#bugs-to-fix-项目目前待解决的问题)
   - [前言](#前言)
   - [threadCache整体框架](#threadcache整体框架)
   - [开始写threadCache代码](#开始写threadcache代码)
@@ -28,6 +29,16 @@
   - [用Radix Tree进行优化](#用radix-tree进行优化)
 
 ***
+
+## ==bugs to fix (项目目前待解决的问题)==
+
+1. 在ubuntu_arm64环境下，如果调用多线程，出现段错误（原因未知，待解决）
+2. 在ubuntu_arm64环境下，radix tree需要用第三棵，前两棵用不了，需要解决。
+3. 在window32位环境下，可以偶尔成功运行，出现偶发段错误，原因未知，待解决。
+
+经过radixtree优化后，模拟实现的tcmalloc效率高于malloc。(win32下测试，会出现偶发段错误)
+
+![](./assets/5.png)
 
 ## 前言
 

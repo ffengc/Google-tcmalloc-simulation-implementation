@@ -35,9 +35,9 @@ void BenchmarkMalloc(size_t ntimes, size_t nworks, size_t rounds) {
     for (auto& t : vthread) {
         t.join();
     }
-    std::cout << nworks << "个线程并发执行" << rounds << "次，每轮次malloc " << ntimes << "次: 花费：" << malloc_costtime.load() << "ms\n";
-    std::cout << nworks << "个线程并发执行" << rounds << "轮次，每轮次free " << ntimes << "次: 花费：" << free_costtime.load() << " ms\n";
-    std::cout << nworks << "个线程并发malloc&free " << nworks * rounds * ntimes << "次，总计花费：" << malloc_costtime.load() + free_costtime.load() << " ms\n";
+    std::cout << nworks << "threads run" << rounds << " times, each round malloc " << ntimes << " times, cost: " << malloc_costtime.load() << "ms\n";
+    std::cout << nworks << "threads run" << rounds << " times, each round free " << ntimes << " times,  cost: " << free_costtime.load() << " ms\n";
+    std::cout << nworks << "threads run malloc and free " << nworks * rounds * ntimes << " time, total cost: " << malloc_costtime.load() + free_costtime.load() << " ms\n";
 }
 
 // 单轮次申请释放次数 线程数 轮次
@@ -70,18 +70,16 @@ void BenchmarkConcurrentMalloc(size_t ntimes, size_t nworks, size_t rounds) {
     for (auto& t : vthread) {
         t.join();
     }
-    std::cout << nworks << "个线程并发执行" << rounds << "轮次，每轮次concurrent alloc " << ntimes << "次: 花费：" << malloc_costtime.load() << " ms\n";
-    std::cout << nworks << "个线程并发执行" << rounds << "轮次，每轮次concurrent dealloc " << ntimes << "次: 花费：" << free_costtime.load() << " ms\n";
-    std::cout << nworks << "个线程并发concurrent alloc&dealloc " << nworks * rounds * ntimes << "次，总计花费：" << malloc_costtime.load() + free_costtime.load() << " ms\n";
+    std::cout << nworks << "threads run" << rounds << " times, each round malloc " << ntimes << " times, cost: " << malloc_costtime.load() << "ms\n";
+    std::cout << nworks << "threads run" << rounds << " times, each round free " << ntimes << " times,  cost: " << free_costtime.load() << " ms\n";
+    std::cout << nworks << "threads run tcmalloc and tcfree " << nworks * rounds * ntimes << " time, total cost: " << malloc_costtime.load() + free_costtime.load() << " ms\n";
 }
 
 int main() {
     size_t n = 1000;
-    std::cout << "==========================================================" << std::endl;
     BenchmarkConcurrentMalloc(n, 4, 10);
-    // std::cout << std::endl
-    //           << std::endl;
-    // BenchmarkMalloc(n, 4, 10);
-    std::cout << "==========================================================" << std::endl;
+    std::cout << std::endl
+              << std::endl;
+    BenchmarkMalloc(n, 4, 10);
     return 0;
 }
