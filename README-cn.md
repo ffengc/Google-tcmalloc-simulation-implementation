@@ -38,4 +38,4 @@
 
 ## 📚项目详细实现记录
 
-- **[work.md](./work.md)**
+- **[work.md (English)](./work.md)** | **[work-cn.md](./work-cn.md)**

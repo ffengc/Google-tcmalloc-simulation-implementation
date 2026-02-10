@@ -1,50 +1,52 @@
-# 项目详细实现
+# Detailed Project Implementation
 
-- [项目详细实现](#项目详细实现)
-  - [threadCache整体框架](#threadcache整体框架)
-  - [开始写threadCache代码](#开始写threadcache代码)
-  - [哈系桶的映射规则](#哈系桶的映射规则)
-  - [threadCache的tls无锁访问](#threadcache的tls无锁访问)
-  - [写tcfree的时候的一个遗留问题](#写tcfree的时候的一个遗留问题)
-  - [central\_cache整体结构](#central_cache整体结构)
-  - [central\_cache的核心逻辑](#central_cache的核心逻辑)
-  - [central\_cache里面fetch\_range\_obj的逻辑](#central_cache里面fetch_range_obj的逻辑)
-  - [page\_cache整体框架](#page_cache整体框架)
-  - [获取span详解](#获取span详解)
-    - [关于 new\_span 如何加锁的文字(重要/容易出bug)](#关于-new_span-如何加锁的文字重要容易出bug)
-  - [内存申请流程联调](#内存申请流程联调)
-  - [thread\_cache内存释放](#thread_cache内存释放)
-  - [central\_cache内存释放](#central_cache内存释放)
-  - [page\_cache内存释放](#page_cache内存释放)
-  - [大于256k的情况](#大于256k的情况)
-  - [处理代码中`new`的问题](#处理代码中new的问题)
-  - [解决free，使其不用传大小](#解决free使其不用传大小)
-  - [多线程场景下深度测试](#多线程场景下深度测试)
-  - [分析性能瓶颈](#分析性能瓶颈)
-  - [用Radix Tree进行优化](#用radix-tree进行优化)
+**English** | [中文](./work-cn.md)
+
+- [Detailed Project Implementation](#detailed-project-implementation)
+  - [ThreadCache Overall Framework](#threadcache-overall-framework)
+  - [Start Writing ThreadCache Code](#start-writing-threadcache-code)
+  - [Hash Bucket Mapping Rules](#hash-bucket-mapping-rules)
+  - [ThreadCache TLS Lock-Free Access](#threadcache-tls-lock-free-access)
+  - [A Legacy Issue When Writing tcfree](#a-legacy-issue-when-writing-tcfree)
+  - [Central Cache Overall Structure](#central-cache-overall-structure)
+  - [Central Cache Core Logic](#central-cache-core-logic)
+  - [The Logic of fetch\_range\_obj in Central Cache](#the-logic-of-fetch_range_obj-in-central-cache)
+  - [Page Cache Overall Framework](#page-cache-overall-framework)
+  - [Detailed Explanation of Getting a Span](#detailed-explanation-of-getting-a-span)
+    - [About How new\_span Handles Locking (Important / Easy to Bug)](#about-how-new_span-handles-locking-important--easy-to-bug)
+  - [Memory Allocation Flow Integration Testing](#memory-allocation-flow-integration-testing)
+  - [Thread Cache Memory Deallocation](#thread-cache-memory-deallocation)
+  - [Central Cache Memory Deallocation](#central-cache-memory-deallocation)
+  - [Page Cache Memory Deallocation](#page-cache-memory-deallocation)
+  - [Handling Allocations Larger Than 256KB](#handling-allocations-larger-than-256kb)
+  - [Handling the `new` Problem in the Code](#handling-the-new-problem-in-the-code)
+  - [Making free Work Without Passing Size](#making-free-work-without-passing-size)
+  - [Deep Testing in Multi-threaded Scenarios](#deep-testing-in-multi-threaded-scenarios)
+  - [Analyzing Performance Bottlenecks](#analyzing-performance-bottlenecks)
+  - [Optimization with Radix Tree](#optimization-with-radix-tree)
 
 
-## threadCache整体框架
+## ThreadCache Overall Framework
 
-**一个重要概念：自由链表，就是把切好的小块内存链接起来，这一块内存的前4个字节是一个指针，指向链表的下一个地方。**
+**An important concept: the free list links small chunks of memory together. The first 4 bytes (or 8 bytes on 64-bit systems) of each chunk serve as a pointer to the next chunk in the list.**
 
-如果是定长内存池，那就是一个自由链表就行了，但是现在不是定长的。
+If this were a fixed-size memory pool, a single free list would suffice. But our pool is not fixed-size.
 
-那是不是1byte一个自由链表，2一个，3一个呢，这也太多了。
+Should we create one free list for 1 byte, one for 2 bytes, one for 3 bytes, and so on? That would be way too many.
 
-规定：小于256kb的找threadCache, 大于256kb后面再说。
+Rule: requests smaller than 256KB go to threadCache; requests larger than 256KB will be handled separately later.
 
-所以如果如果1，2，3，4比特都挂一个链表，那就是二十几万个链表，太大了！
+If we hung a separate list for every byte size from 1 to 256K, that would be over two hundred thousand lists — far too many!
 
-所以如图所示，我们就这么设计。
+So as shown in the diagram below, we design it this way:
 
 ![](./assets/2.png)
 
-这是一种牺牲和妥协。
+This is a compromise and trade-off.
 
-## 开始写threadCache代码
+## Start Writing ThreadCache Code
 
-首先肯定要提供这两个接口，不用说的。
+First, we obviously need to provide these two interfaces:
 
 thread_cache.hpp
 ```cpp
@@ -56,7 +58,7 @@ public:
 };
 ```
 
-当然我们发现，控制自由链表需要一个类，然后这个类不仅threadCache要用，其他上层的也要用，所以我们写在 common.hpp 里面去。
+We notice that the free list class is needed not only by threadCache but also by the upper layers, so we put it in common.hpp.
 
 ```cpp
 class free_list {
@@ -68,7 +70,7 @@ public:
 };
 ```
 
-push和pop实现很简单，头插和头删就行了。
+The push and pop implementations are straightforward — just head insertion and head deletion.
 
 ```cpp
     void push(void* obj) {
@@ -77,9 +79,9 @@ push和pop实现很简单，头插和头删就行了。
     }
 ```
 
-这个`*(void**)obj`需要理解一下，因为我们不知道当前环境下一个指针是4个字节的还是8个字节的，所以要这样才能取到指针的大小。
+The expression `*(void**)obj` needs some explanation: since we don't know whether a pointer is 4 bytes or 8 bytes in the current environment, this cast ensures we always read/write exactly one pointer's worth of bytes.
 
-然后我们也可以封装一下
+Then we can also encapsulate it:
 
 ```cpp
 class free_list {
@@ -105,31 +107,31 @@ private:
 };
 ```
 
-## 哈系桶的映射规则
+## Hash Bucket Mapping Rules
 
-我们可以写一个类，去计算对象大小的对齐映射规则。
+We can write a class to compute the size alignment and mapping rules for objects.
 
-tcmalloc里面的映射规则是很复杂的，这里我们进行简化了。
+The mapping rules in tcmalloc are quite complex; here we simplify them.
 
-映射规则如下：
+The mapping rules are as follows:
 
-整体控制在最多10%左右的内碎片浪费 
+Overall, internal fragmentation is controlled to at most ~10%.
 
-| 申请的字节数量 | 对齐数 | 自由链表里对应的范围 |
+| Request Size (bytes) | Alignment | Free List Range |
 |-------|-------|-------|
-| [1,128] | 8byte对齐 | freelist[0,16) |
-| [128+1,1024] | 16byte对齐 | freelist[16,72) |
-| [1024+1,8*1024] | 128byte对齐 | freelist[72,128) |
-| [8*1024+1,64*1024] | 1024byte对齐 | freelist[128,184) |
-| [64*1024+1,256*1024] | 8*1024byte对齐 | freelist[184,208) |
+| [1, 128] | 8-byte aligned | freelist[0, 16) |
+| [128+1, 1024] | 16-byte aligned | freelist[16, 72) |
+| [1024+1, 8*1024] | 128-byte aligned | freelist[72, 128) |
+| [8*1024+1, 64*1024] | 1024-byte aligned | freelist[128, 184) |
+| [64*1024+1, 256*1024] | 8*1024-byte aligned | freelist[184, 208) |
 
-**这样我们可以控制最多10%的内碎片浪费，如果你申请的多，那我就允许你浪费的稍微多一点，这个也是很合理的（这个规则是本项目设定的，tcmalloc的更加复杂）**
+**This way we can control internal fragmentation to at most 10%. If you request more memory, we allow slightly more waste — which is reasonable. (These rules are specific to this project; tcmalloc's rules are more complex.)**
 
-所以我们先确定跟谁对齐，然后再找对齐数。
+So we first determine what to align to, then find the alignment number.
 
 common.hpp
 ```cpp
-// 计算对象大小的对齐映射规则
+// Compute object size alignment mapping rules
 class size_class {
 public:
     static inline size_t __round_up(size_t bytes, size_t align_number) {
@@ -154,7 +156,7 @@ public:
 };
 ```
 
-如何理解这个代码。
+How to understand this code:
 
 ```cpp
     size_t __round_up(size_t size, size_t align_number) {
@@ -162,7 +164,7 @@ public:
     }
 ```
 
-大佬想出来的，我们可以测试几个。
+This is a clever trick. You can verify it with a few test cases.
 
 thread_cache.cc
 ```cpp
@@ -171,25 +173,27 @@ void* thread_cache::allocate(size_t size) {
     size_t align_size = size_class::round_up(size);
 }
 ```
-现在我们就可以获得对齐之后的大小了！也就是说，你申请size字节，我会给你align_size字节。
-那么是在哪一个桶里面取出来的这一部分内存呢？所以我们还要写方法去找这个桶在哪。
+Now we can get the aligned size! That is, if you request `size` bytes, we will give you `align_size` bytes.
+But which bucket does this memory come from? So we also need a method to find the bucket.
 
 
 ```cpp
-    // 计算映射的哪一个自由链表桶
+    // Compute which free list bucket to map to
     static inline size_t __bucket_index(size_t bytes, size_t align_shift) {
         return ((bytes + (1 << align_shift) - 1) >> align_shift) - 1;
-        /* 
-            这个还是同一道理，bytes不是对齐数的倍数，那就是直接模就行了 
-            如果是，那就特殊规则一下即可，比如 1~128字节，对齐数字是8
-            那就是 bytes / 8 + 1 就是几号桶了
-            如果 bytes % 8 == 0 表示没有余数，刚好就是那个桶，就不用+1
-            这个也很好理解
+        /*
+            Same idea: if bytes is not a multiple of the alignment,
+            just divide and round up.
+            If it is, apply a special rule. For example, for 1~128 bytes
+            with alignment 8: bucket = bytes / 8 + 1
+            If bytes % 8 == 0, there's no remainder, it's exactly that bucket,
+            so no +1 is needed.
+            This is also easy to understand.
         */
     }
     static inline size_t bucket_index(size_t bytes) {
         assert(bytes <= MAX_BYTES);
-        // 每个区间有多少个链
+        // Number of lists in each range
         static int group_array[4] = { 16, 56, 56, 56 };
         if (bytes <= 128) {
             return __bucket_index(bytes, 3);
@@ -209,17 +213,17 @@ void* thread_cache::allocate(size_t size) {
     }
 ```
 
-这个其实也是很好理解的，因为每个对齐区间有多少个桶已经确定了：
+This is also quite easy to understand, because the number of buckets in each alignment range is already determined:
 
-如果按照8对齐：16个桶
-如果按照16对齐：56个桶
+If aligned by 8: 16 buckets
+If aligned by 16: 56 buckets
 ...
 
-然后bucket_index里面，为什么后面要+group_array的数字，因为__bucket_index只算出来了你是这一组的第几个，不是在全部桶里面的第几个。
+In `bucket_index`, why do we add `group_array` numbers at the end? Because `__bucket_index` only computes which bucket you are *within your group*, not the global bucket index.
 
-> 比如你是按照16对齐的，你的桶的编号肯定是大于16了，因为按照8对齐的已经用了16个桶了，所以你肯定是第17个桶开始。那么__bucket_index可以告诉你，你是按照16对齐的这56个桶里的第一个，在这一组里面你是第一个桶，但是在全部桶里面，你是第17个桶了。
+> For example, if you're in the 16-byte aligned group, your bucket number is definitely greater than 16, because the 8-byte aligned group already used 16 buckets. So you start from the 17th bucket. `__bucket_index` tells you that you're the first bucket in this group of 56, but globally you're the 17th bucket.
 
-然后thread_cache.cc这里面就可以完善了。
+Then thread_cache.cc can be completed:
 
 ```cpp
 void* thread_cache::allocate(size_t size) {
@@ -229,43 +233,42 @@ void* thread_cache::allocate(size_t size) {
     if (!__free_lists[bucket_index].empty()) {
         return __free_lists[bucket_index].pop();
     } else {
-        // 这个桶下面没有内存了！找centralCache找
+        // This bucket has no memory! Go to centralCache
         return fetch_from_central_cache(bucket_index, align_size);
     }
 }
 ```
 
-## threadCache的tls无锁访问
+## ThreadCache TLS Lock-Free Access
 
-首先，如果我们了解过操作系统相关知识，我们就知道，进程里面（包括线程）这些，都是共享的。也就是说，如果我们不加处理，我们创建的threadCache是所有线程都能访问的。
+First, if we understand operating system concepts, we know that within a process (including threads), everything is shared. This means that without special handling, the threadCache we create would be accessible to all threads.
 
-这个不是我们想要的，我们需要的是，每一个线程都有自己的threadCache!
+That's not what we want — we need each thread to have its own threadCache!
 
-> 线程局部存储（TLS），是一种变量的存储方法，这个变量在它所在的线程内是全局可访问的，但是不能被其他线程访问到，这样就保持了数据的线程独立性。而熟知的全局变量，是所有线程都可以访问的，这样就不可避免需要锁来控制，增加了控制成本和代码复杂度。
+> Thread Local Storage (TLS) is a storage mechanism where a variable is globally accessible within its owning thread but cannot be accessed by other threads. This maintains data isolation between threads. In contrast, well-known global variables are accessible to all threads, which inevitably requires locks for access control, increasing complexity and overhead.
 
-
-然后linux下这样操作就行了。
+On Linux, we just do this:
 
 thread_cache.hpp
 ```cpp
 __thread thread_cache* p_tls_thread_cache = nullptr;
 ```
 
-windows下这样写
+On Windows:
 
 ```cpp
 __thread static thread_cache* p_tls_thread_cache = nullptr;
 ```
 
-这个也很好理解了，这样声明这个变量之后，这个p_tls_thread_cache变量就会每个线程独享一份。
+This is easy to understand: by declaring the variable this way, each thread gets its own copy of `p_tls_thread_cache`.
 
-然后我们调用的时候，也不可能让别人直接去调用thread_cache.cc里面的alloc，所以，我们再弄一个文件，提供一个调用的接口。
+When calling, we can't expect users to directly call thread_cache.cc's alloc. So we create another file to provide a calling interface.
 
 tcmalloc.hpp
 ```cpp
 static void* tcmalloc(size_t size) {
     if (p_tls_thread_cache == nullptr)
-        // 相当于单例
+        // Essentially a singleton per thread
         p_tls_thread_cache = new thread_cache;
     return p_tls_thread_cache->allocate(size);
 }
@@ -275,7 +278,7 @@ static void tcfree(size_t size) {
 #endif
 ```
 
-## 写tcfree的时候的一个遗留问题
+## A Legacy Issue When Writing tcfree
 
 tcmalloc.hpp
 ```cpp
@@ -295,35 +298,35 @@ void thread_cache::deallocate(void* ptr, size_t size) {
 }
 ```
 
-我这里是要传大小的，但是呢，p_tls_thread_cache->deallocate()需要给size，不然不知道还到哪一个桶上。但是我们的free是不用传size的，这里如何解决？
+Here we need to pass the size, because `p_tls_thread_cache->deallocate()` needs `size` to know which bucket to return memory to. But the standard `free` doesn't require passing a size — how do we solve this?
 
-目前解决不了，先保留这个问题，留到后面再解决。
+We can't solve it right now. Let's keep this issue and revisit it later.
 
-## central_cache整体结构
+## Central Cache Overall Structure
 
-centralCache也是一个哈希桶结构，他的哈希桶的映射关系跟threadCache是一样的。不同的是他的每个哈希桶位置挂是SpanList链表结构，不过每个映射桶下面的span中的大内存块被按映射关系切成了一个个小内存块对象挂在span的自由链表中。
+CentralCache is also a hash bucket structure. Its hash bucket mapping is the same as threadCache's. The difference is that each hash bucket position holds a SpanList linked list structure, and each span's large memory block is cut into small memory block objects according to the mapping relation, linked in the span's free list.
 
-这里是需要加锁的，但是是桶锁。如果不同线程获取不同的桶的东西，就不用加锁。
+Locking is needed here, but it uses bucket locks. If different threads access different buckets, no locking is required.
 
 ![](./assets/3.png)
 
-**申请内存:**
-1. 当thread cache中没有内存时，就会批量向central cache申请一些内存对象，这里的批量获取对 象的数量使用了类似网络tcp协议拥塞控制的慢开始算法;central cache也有一个哈希映射的 spanlist，spanlist中挂着span，从span中取出对象给thread cache，这个过程是需要加锁的，不 过这里使用的是一个桶锁，尽可能提高效率。
-2. central cache映射的spanlist中所有span的都没有内存以后，则需要向page cache申请一个新的 span对象，拿到span以后将span管理的内存按大小切好作为自由链表链接到一起。然后从span 中取对象给thread cache。
-3. central cache的中挂的span中use_count记录分配了多少个对象出去，分配一个对象给thread cache，就++use_count
+**Memory allocation:**
+1. When thread cache runs out of memory, it batch-requests memory objects from central cache. The batch quantity uses a slow-start algorithm similar to TCP congestion control. Central cache also has a hash-mapped spanlist; spanlist contains spans, and objects are taken from spans to give to thread cache. This process requires locking, but bucket locks are used here to maximize efficiency.
+2. When all spans in central cache's mapped spanlist have no memory left, a new span object needs to be requested from page cache. After getting the span, the memory it manages is cut into fixed-size blocks linked together as a free list. Then objects are taken from the span to give to thread cache.
+3. The `use_count` in each span of central cache tracks how many objects have been distributed. Each time an object is given to thread cache, `++use_count`.
 
 
-**释放内存:**
+**Memory deallocation:**
 
-1. 当threadCache过长或者线程销毁，则会将内存释放回centralCache中的，释放回来时--use_count。当use_count减到0时则表示所有对象都回到了span，则将span释放回pageCache，pageCache中会对前后相邻的空闲页进行合并。
+1. When threadCache's free list gets too long or the thread is destroyed, memory is released back to centralCache, and `--use_count`. When use_count drops to 0, it means all objects have returned to the span, and the span is released back to pageCache. PageCache will then merge adjacent pages to form larger pages, alleviating memory fragmentation.
 
-**centralCache里面的小对象是由大对象切出来的，大对象就是Span。**
+**The small objects in centralCache are cut from large objects, and the large objects are Spans.**
 
-span的链表是双向链表。
+The span list is a doubly-linked list.
 
-span除了central_cache要用，后面的page_cache也要用，所以定义到common里面去吧。
+Since span is needed by both central_cache and page_cache, let's define it in common.
 
-然后这里存在一个问题，就是这个size_t，在64位下不够了，需要条件编译处理一下。
+There's a problem here: `size_t` is not large enough on 64-bit systems, so we need conditional compilation.
 
 common.hpp
 ```cpp
@@ -334,27 +337,27 @@ typedef size_t PAGE_ID;
 #endif
 ```
 
-这里如果在windows下有个坑，win64下是既有win64也有win32的定义的，所以要先判断64的，避免出bug。
+Note a pitfall on Windows: Win64 defines both win64 and win32, so we must check 64-bit first to avoid bugs.
 
 ```cpp
-// 管理大块内存
+// Manages large memory blocks
 class span {
 public:
-    PAGE_ID __page_id; // 大块内存起始页的页号
-    size_t __n; // 页的数量
-    // 双向链表结构
+    PAGE_ID __page_id; // Page number of the starting page of the large memory block
+    size_t __n; // Number of pages
+    // Doubly-linked list structure
     span* __next;
     span* __prev;
-    size_t __use_count; // 切成段小块内存，被分配给threadCache的计数器
-    void* __free_list; // 切好的小块内存的自由链表
+    size_t __use_count; // Counter for small blocks distributed to threadCache
+    void* __free_list; // Free list of cut small memory blocks
 };
 ```
 
-然后就要手撕一个双链表了，十分简单，不多说了。这里面，每一个桶要维护一个锁！
+Then we need to implement a doubly-linked list by hand — straightforward, not much to say. Each bucket needs to maintain a lock!
 
 common.hpp
 ```cpp
-// 带头双向循环链表
+// Doubly-linked circular list with head node
 class span_list {
 private:
     span* __head = nullptr;
@@ -366,7 +369,7 @@ public:
         __head->__prev = __head;
     }
     void insert(span* pos, span* new_span) {
-        // 插入的是一个完好的span
+        // Insert a complete span
         assert(pos);
         assert(new_span);
         span* prev = pos->__prev;
@@ -392,30 +395,30 @@ central_cache.hpp
 
 class central_cache {
 private:
-    span_list __span_lists[BUCKETS_NUM]; // 有多少个桶就多少个
+    span_list __span_lists[BUCKETS_NUM]; // One per bucket
 public:
-    
+
 };
 ```
 
-有多少个桶就有多少把锁！
+As many buckets as there are, that's how many locks we have!
 
 
-## central_cache的核心逻辑
+## Central Cache Core Logic
 
-**很明显这里是比较适合使用单例模式的。因为每个进程只需要维护一个central_cache。单例模式的详细说明可以见我的博客: [单例模式](https://blog.csdn.net/Yu_Cblog/article/details/131787131)**
+**Clearly, this is well suited for the singleton pattern, since each process only needs one central_cache. For detailed explanation of the singleton pattern, see my blog: [Singleton Pattern](https://blog.csdn.net/Yu_Cblog/article/details/131787131)**
 
 
-然后这里我们用饿汉模式。
+Here we use the eager initialization approach.
 
 ```cpp
 class central_cache {
 private:
-    span_list __span_lists[BUCKETS_NUM]; // 有多少个桶就多少个
+    span_list __span_lists[BUCKETS_NUM]; // One per bucket
 private:
     static central_cache __s_inst;
-    central_cache() = default; // 构造函数私有
-    central_cache(const central_cache&) = delete; // 不允许拷贝
+    central_cache() = default; // Private constructor
+    central_cache(const central_cache&) = delete; // No copying allowed
 public:
     central_cache* get_instance() { return &__s_inst; }
 public:
@@ -423,19 +426,19 @@ public:
 ```
 
 
-然后threadCache找你要内存了，你给多少呢？
+So when threadCache asks for memory, how much do we give?
 
-这里用了一个类似tcp的慢开始的反馈算法。我们可以把这个算法写到size_class里面去。
+Here we use a slow-start feedback algorithm similar to TCP. We can put this algorithm in size_class.
 
 common.hpp::size_class
 ```cpp
-    // 一次threadCache从centralCache获取多少个内存
+    // How many objects threadCache fetches from centralCache at once
     static inline size_t num_move_size(size_t size) {
         if (size == 0)
             return 0;
-        // [2, 512], 一次批量移动多少个对象的（慢启动）上限制
-        // 小对象一次批量上限高
-        // 大对象一次批量上限低
+        // [2, 512], upper limit for batch object transfer (slow start)
+        // Small objects: higher batch upper limit
+        // Large objects: lower batch upper limit
         int num = MAX_BYTES / size;
         if (num < 2)
             num = 2;
@@ -445,47 +448,47 @@ common.hpp::size_class
     }
 ```
 
-用这个方法，可以告诉threadCache，本次要从centralCache获取多少内存。
+This method tells threadCache how many objects to fetch from centralCache this time.
 
-然后为了控制慢开始，在free_list里面还需要控制一个max_size，然后这个字段递增，就能控制慢启动了。
+To control the slow start, free_list also needs a `max_size` field that increments over time.
 
 thread_cache.cc
 ```cpp
 void* thread_cache::fetch_from_central_cache(size_t index, size_t size) {
-    // 慢开始反馈调节算法
+    // Slow-start feedback adjustment algorithm
     size_t batch_num = std::min(__free_lists[index].max_size(), size_class::num_move_size(size));
     if (__free_lists[index].max_size() == batch_num)
-        __free_lists[index].max_size() += 1; // 最多增长到512了
-    // 1. 最开始一次向centralCache要太多，因为太多了可能用不完
-    // 2. 如果你一直有这个桶size大小的内存，那么后面我可以给你越来越多，直到上限(size_class::num_move_size(size))
-    //      这个上限是根据这个桶的内存块大小size来决定的
-    // 3. size越大，一次向centralcache要的就越小，如果size越小，相反。
+        __free_lists[index].max_size() += 1; // Grows up to 512 at most
+    // 1. Initially don't request too much from centralCache, because excess may go unused
+    // 2. If you keep requesting this bucket size, we gradually give you more, up to the limit (size_class::num_move_size(size))
+    //      This limit is determined by the memory block size of this bucket
+    // 3. The larger the size, the fewer we fetch from centralCache at once; the smaller the size, the opposite
     return nullptr;
 }
 ```
 
 
-然后去调用这个fetch_range_obj函数。
+Then we call the fetch_range_obj function.
 
-参数的意义：获取一段内存，从start到end个块，一共获取batch_num个，然后每一个块的大小是size，end-start应该等于batch_num。
+Parameter meanings: get a range of memory from `start` to `end` blocks, fetching `batch_num` blocks total, each of size `size`. `end - start` should equal `batch_num`.
 
-返回值的意义：这里向central_cache中的span获取batch_num个，那么这个span一定有这么多个吗？不一定。span下如果不够，就全部给你。actual_n表示实际获取到了多少个。 1 <= actual_n <= batch_num。
+Return value meaning: we request `batch_num` objects from central_cache's span, but does the span necessarily have that many? Not necessarily. If the span doesn't have enough, it gives all it has. `actual_n` represents how many were actually obtained. `1 <= actual_n <= batch_num`.
 
 
 
 thread_cache.cc
 ```cpp
 void* thread_cache::fetch_from_central_cache(size_t index, size_t size) {
-    // 慢开始反馈调节算法
+    // Slow-start feedback adjustment algorithm
     size_t batch_num = std::min(__free_lists[index].max_size(), size_class::num_move_size(size));
     if (__free_lists[index].max_size() == batch_num)
-        __free_lists[index].max_size() += 1; // 最多增长到512了
-    // 1. 最开始一次向centralCache要太多，因为太多了可能用不完
-    // 2. 如果你一直有这个桶size大小的内存，那么后面我可以给你越来越多，直到上限(size_class::num_move_size(size))
-    //      这个上限是根据这个桶的内存块大小size来决定的
-    // 3. size越大，一次向centralcache要的就越小，如果size越小，相反。
+        __free_lists[index].max_size() += 1; // Grows up to 512 at most
+    // 1. Initially don't request too much from centralCache, because excess may go unused
+    // 2. If you keep requesting this bucket size, we gradually give you more, up to the limit (size_class::num_move_size(size))
+    //      This limit is determined by the memory block size of this bucket
+    // 3. The larger the size, the fewer we fetch from centralCache at once; the smaller the size, the opposite
 
-    // 开始获取内存了
+    // Start fetching memory
     void* start = nullptr;
     void* end = nullptr;
     size_t actual_n = central_cache::get_instance()->fetch_range_obj(start, end, batch_num, size);
@@ -493,12 +496,12 @@ void* thread_cache::fetch_from_central_cache(size_t index, size_t size) {
 }
 ```
 
-然后我们获取到从cc(centralCache)里面的内存了，这里分两种情况：
+After fetching memory from cc (centralCache), there are two cases:
 
-1. cc只给了tc一个内存块(actual_n==1时), 此时直接返回就行了。此时thread_cache::allocate会直接把获取到的这一块交给用户，不用经过tc的哈希桶了。
-2. 但是如果cc给我们的是一段(actual_n>=1)，只需要给用户其中一块，其他的要插入到tc里面去！所以我们要给free_list提供一个插入一段（好几块size大小内存）的方法，也是头插就行了。
+1. cc gave tc only one memory block (`actual_n == 1`): just return it directly. In this case, `thread_cache::allocate` will hand this block directly to the user without going through tc's hash bucket.
+2. If cc gives us a range (`actual_n >= 1`), we only give one block to the user and insert the rest into tc! So we need to provide free_list with a method to insert a range (multiple blocks of size `size`) — just head insertion.
 
-可以重载一下。
+We can overload:
 
 common.hpp::free_list
 ```cpp
@@ -525,46 +528,46 @@ thread_cache.cc
 
 ```
 
-这里push的是start的下一个位置，start就不用经过tc了，start直接返回给用户，然后start+1到end位置的，插入到tc里面去。
+Here push starts from `start`'s next position — `start` doesn't need to go through tc; `start` is returned directly to the user. The blocks from `start+1` to `end` are inserted into tc.
 
-## central_cache里面fetch_range_obj的逻辑
+## The Logic of fetch_range_obj in Central Cache
 
 ```cpp
 size_t central_cache::fetch_range_obj(void*& start, void*& end, size_t batch_num, size_t size) {
-    size_t index = size_class::bucket_index(size); // 算出在哪个桶找
-    
+    size_t index = size_class::bucket_index(size); // Find which bucket
+
 }
 ```
 
-算出在哪桶里面找之后，就要分情况了。
+After finding the bucket, we need to handle different cases.
 
-首先，如果这个桶里面一个span都没挂，那就要找下一层了，找pc要。
+First, if no span is hanging in this bucket, we need to go to the next level — ask pc (pageCache).
 
-如果有挂一些span，也要分情况。
+If some spans exist, there are also different cases.
 
-我们要先找到一个非空的span。
+We need to find a non-empty span first.
 
-所以写一个方法，不过这个方法可以后面再实现。
+So let's write a method for this, though we can implement it later.
 
-然后这里要注意一下。自由链表是单链表，如果我们取一段出来，最后要记得链表末尾给一个nullptr。
+Note here: the free list is a singly-linked list. If we take a segment out, we must remember to set nullptr at the end.
 
-**注意细节：**
-1. 取batch_num个，end指针只需要走batch_num步（前提是span下面够这么多）！
-2. 如果span下面不够，要特殊处理！
+**Important details:**
+1. To take `batch_num` blocks, the end pointer only needs to walk `batch_num` steps (provided the span has enough)!
+2. If the span doesn't have enough, special handling is needed!
 
 
 ```cpp
 size_t central_cache::fetch_range_obj(void*& start, void*& end, size_t batch_num, size_t size) {
-    size_t index = size_class::bucket_index(size); // 算出在哪个桶找
-    __span_lists[index].__bucket_mtx.lock(); // 加锁（可以考虑RAII）
-    span* cur_span = get_non_empty_span(__span_lists[index], size); // 找一个非空的span（有可能找不到）
+    size_t index = size_class::bucket_index(size); // Find which bucket
+    __span_lists[index].__bucket_mtx.lock(); // Lock (consider RAII)
+    span* cur_span = get_non_empty_span(__span_lists[index], size); // Find a non-empty span (might not find one)
     assert(cur_span);
-    assert(cur_span->__free_list); // 这个非空的span一定下面挂着内存了，所以断言一下
+    assert(cur_span->__free_list); // This non-empty span must have memory hanging below, so assert
 
     start = cur_span->__free_list;
-    // 这里要画图理解一下
+    // Draw a diagram to understand this
     end = start;
-    // 开始指针遍历，从span中获取对象，如果不够，有多少拿多少
+    // Start pointer traversal, get objects from span; if not enough, take as many as available
     size_t i = 0;
     size_t actual_n = 1;
     while (i < batch_num - 1 && free_list::__next_obj(end) != nullptr) {
@@ -574,29 +577,29 @@ size_t central_cache::fetch_range_obj(void*& start, void*& end, size_t batch_num
     }
     cur_span->__free_list = free_list::__next_obj(end);
     free_list::__next_obj(end) = nullptr;
-    __span_lists[index].__bucket_mtx.unlock(); // 解锁
+    __span_lists[index].__bucket_mtx.unlock(); // Unlock
     return actual_n;
 }
 ```
 
-当然cc到这里还没有完全写完的，但是我们要继续先写pc，才能来完善这里的部分。
+Of course, cc is not fully complete yet. We need to write pc first before we can complete the remaining parts here.
 
-## page_cache整体框架
+## Page Cache Overall Framework
 
 ![](./assets/4.png)
 
-**申请内存:**
-1. 当central cache向page cache申请内存时，page cache先检查对应位置有没有span，如果没有 则向更大页寻找一个span，如果找到则分裂成两个。比如:申请的是4页page，4页page后面没 有挂span，则向后面寻找更大的span，假设在10页page位置找到一个span，则将10页page span分裂为一个4页page span和一个6页page span。
-2. 如果找到_spanList[128]都没有合适的span，则向系统使用mmap、brk或者是VirtualAlloc等方式 申请128页page span挂在自由链表中，再重复1中的过程。
-3. 需要注意的是central cache和page cache 的核心结构都是spanlist的哈希桶，但是他们是有本质 区别的，central cache中哈希桶，是按跟thread cache一样的大小对齐关系映射的，他的spanlist 中挂的span中的内存都被按映射关系切好链接成小块内存的自由链表。而page cache 中的 spanlist则是按下标桶号映射的，也就是说第i号桶中挂的span都是i页内存。
+**Memory allocation:**
+1. When central cache requests memory from page cache, page cache first checks if there's a span at the corresponding position. If not, it looks for a larger span further along and splits it. For example: if requesting 4 pages and no span is available at the 4-page position, look further for a larger span. Say we find a span at the 10-page position — we split the 10-page span into a 4-page span and a 6-page span.
+2. If no suitable span is found even at `_spanList[128]`, request a 128-page span from the system using mmap, brk, or VirtualAlloc and add it to the free list, then repeat step 1.
+3. Note that while both central cache and page cache use spanlist hash buckets as their core structure, they are fundamentally different. Central cache's hash buckets use the same size-alignment mapping as thread cache, and the memory in its spans is cut into small blocks linked as a free list. Page cache's spanlist, however, is mapped by bucket index number — the i-th bucket contains spans of exactly i pages.
 
 
-**释放内存:**
-1. 如果central cache释放回一个span，则依次寻找span的前后page id的没有在使用的空闲span，看是否可以合并，如果合并继续向前寻找。这样就可以将切小的内存合并收缩成大的span，减少内存碎片。
+**Memory deallocation:**
+1. When central cache releases a span back, page cache searches for free (unused) spans at adjacent page IDs (before and after), checking if they can be merged. If merged, it continues looking further. This way, small memory fragments can be merged back into larger spans, reducing memory fragmentation.
 
-**这里的映射和之前的不一样，这里一共是128个桶，第一个是一页，第二个是两页！**
+**The mapping here is different from before: there are 128 buckets total, the first for 1 page, the second for 2 pages!**
 
-**pc只关注cc要多少页！注意，单位是页！**
+**pc only cares about how many pages cc wants! Note: the unit is pages!**
 
 page_cache.hpp
 ```cpp
@@ -611,26 +614,24 @@ private:
 public:
     static page_cache* get_instance() { return &__s_inst; }
 public:
-    // 获取一个K页的span
+    // Get a span of K pages
 };
 ```
 
-也是要设计成单例模式。
+This also needs to be designed as a singleton.
 
-然后怎么初始化呢？
+How do we initialize? Start with everything empty, then request a 128-page span from the OS (heap). Later, when a request comes (say for 2 pages), we split the 128-page span into a 126-page span and a 2-page span. The 2-page span goes to cc, and the 126-page span hangs on bucket 126.
 
-一开始全部设置为空，然后向OS（heap）要128页的span，然后后面要（假设要两页），那就把这个128页的的切分成126页的和2页的。然后2页的给cc，126页的就挂到126的桶上。
+When cc has memory it doesn't need, it returns it to the corresponding span. Then pc checks whether adjacent pages (by page number) are free. If so, they are merged into larger pages, solving the memory fragmentation problem.
 
-然后当cc有内存不要的时候，就还到对应的span里面去。然后pc通过页号，查看前后相邻页是否空闲，是的话就合并，和病除更大的页，解决内存碎片问题。
+## Detailed Explanation of Getting a Span
 
-## 获取span详解
-
-我们要遍历cc中的span，我们可以在common.hpp里面写一些遍历链表的组建。
+To traverse spans in cc, we can write some list traversal helpers in common.hpp.
 
 common.hpp
 ```cpp
 public:
-    // 遍历相关
+    // Traversal helpers
     span* begin() { return __head->__next; }
     span* end() { return __head; }
 ```
@@ -638,76 +639,76 @@ public:
 central_cache.cc
 ```cpp
 span* central_cache::get_non_empty_span(span_list& list, size_t size) {
-    // 先查看当前的spanlist中是否还有非空的span
+    // First check if there's a non-empty span in the current spanlist
     span* it = list.begin();
     while (it != list.end()) {
-        if (it->__free_list != nullptr) // 找到非空的了
+        if (it->__free_list != nullptr) // Found a non-empty one
             return it;
         it = it->__next;
     }
-    //如果走到这里，说明没有空闲的span了，就要找pc了
+    // If we reach here, there are no free spans — need to ask pc
     page_cache::get_instance()->new_span();
     return nullptr;
 }
 ```
 
-问题是，要多少页呢？也是有一个计算方法的，放到size_class里面去！
+The question is: how many pages do we need? There's a calculation method for this too; let's put it in size_class!
 
 common.hpp
 ```cpp
     static inline size_t num_move_page(size_t size) {
         size_t num = num_move_size(size);
         size_t npage = num * size;
-        npage >>= PAGE_SHIFT; // 相当于 /= 8kb
+        npage >>= PAGE_SHIFT; // Equivalent to /= 8KB
         if (npage == 0)
             npage = 1;
         return npage;
     }
 ```
 
-所以。
+So:
 central_cache.cc
 ```cpp
 span* central_cache::get_non_empty_span(span_list& list, size_t size) {
-    // 先查看当前的spanlist中是否还有非空的span
+    // First check if there's a non-empty span in the current spanlist
     span* it = list.begin();
     while (it != list.end()) {
-        if (it->__free_list != nullptr) // 找到非空的了
+        if (it->__free_list != nullptr) // Found a non-empty one
             return it;
         it = it->__next;
     }
-    //如果走到这里，说明没有空闲的span了，就要找pc了
+    // If we reach here, there are no free spans — need to ask pc
     span* cur_span = page_cache::get_instance()->new_span(size_class::num_move_page(size));
-    // 切分的逻辑
+    // Cutting logic
     return nullptr;
 }
 ```
 
-下面就是切分的逻辑了。
+Now comes the cutting logic.
 
-怎么找到这个内存的地址呢？
+How do we find the memory address?
 
-如果页号是100。那么页的起始地址就是 `100 << PAGE_SHIFT`。
+If the page number is 100, then the starting address of the page is `100 << PAGE_SHIFT`.
 
 central_cache.cc
 ```cpp
 span* central_cache::get_non_empty_span(span_list& list, size_t size) {
-    // 先查看当前的spanlist中是否还有非空的span
+    // First check if there's a non-empty span in the current spanlist
     span* it = list.begin();
     while (it != list.end()) {
-        if (it->__free_list != nullptr) // 找到非空的了
+        if (it->__free_list != nullptr) // Found a non-empty one
             return it;
         it = it->__next;
     }
-    // 如果走到这里，说明没有空闲的span了，就要找pc了
+    // If we reach here, there are no free spans — need to ask pc
     span* cur_span = page_cache::get_instance()->new_span(size_class::num_move_page(size));
-    // 切分的逻辑
-    // 1. 计算span的大块内存的起始地址和大块内存的大小（字节数）
+    // Cutting logic
+    // 1. Compute the starting address and byte size of the span's large memory block
     char* addr_start = (char*)(cur_span->__page_id << PAGE_SHIFT);
-    size_t bytes = cur_span->__n << PAGE_SHIFT; // << PAGE_SHIFT 就是乘8kb的意思
+    size_t bytes = cur_span->__n << PAGE_SHIFT; // << PAGE_SHIFT means multiply by 8KB
     char* addr_end = addr_start + bytes;
-    // 2. 把大块内存切成自由链表链接起来
-    cur_span->__free_list = addr_start; // 先切一块下来做头
+    // 2. Cut the large memory block into a free list
+    cur_span->__free_list = addr_start; // Cut the first block as the head
     addr_start += size;
     void* tail = cur_span->__free_list;
     while(addr_start < addr_end) {
@@ -720,55 +721,55 @@ span* central_cache::get_non_empty_span(span_list& list, size_t size) {
 }
 ```
 
-注意，这里的切分是指把大块内存切成自由链表。不是pc里面的把大页切成小页。
+Note: the "cutting" here means cutting the large memory block into a free list of small blocks — not the page cache splitting large pages into smaller pages.
 
-然后写完上面那个，我们既要去写 `span* page_cache::new_span(size_t k)` 了。这里就要把大页切成小页了。
+After writing the above, we need to implement `span* page_cache::new_span(size_t k)`. This is where large pages are split into smaller pages.
 
 page_cache.cc
 ```cpp
-// cc向pc获取k页的span
+// cc requests a k-page span from pc
 span* page_cache::new_span(size_t k) {
     assert(k > 0 && k < PAGES_NUM);
-    // 先检查第k个桶是否有span
+    // First check if the k-th bucket has a span
     if (!__span_lists[k].empty())
         return __span_lists->pop_front();
-    // 第k个桶是空的->去检查后面的桶里面有无span，如果有，可以把它进行切分
+    // The k-th bucket is empty -> check subsequent buckets for a span to split
     for (size_t i = k + 1; i < PAGES_NUM; i++) {
         if (!__span_lists[i].empty()) {
-            // 可以开始切了
-            // 假设这个页是n页的，需要的是k页的
-            // 1. 从__span_lists中拿下来 2. 切开 3. 一个返回给cc 4. 另一个挂到 n-k 号桶里面去
+            // We can start splitting
+            // Suppose this span has n pages and we need k pages
+            // 1. Remove from __span_lists  2. Split  3. Return one to cc  4. Hang the other on bucket n-k
             span* n_span = __span_lists[i].pop_front();
             span* k_span = new span;
-            // 在n_span头部切除k页下来
+            // Cut k pages from the front of n_span
             k_span->__page_id = n_span->__page_id; // <1>
             k_span->__n = k; // <2>
             n_span->__page_id += k; // <3>
             n_span->__n -= k; // <4>
             /**
-             * 这里要好好理解一下 100 ------ 101 ------- 102 ------
-             * 假设n_span从100开始，大小是3
-             * 切出来之后k_span就是从100开始了，所以<1>
-             * 切出来之后k_span就有k页了，所以 <2>
-             * 切出来之后n_span就是从102开始了，所以 <3>
-             * 切出来之后n_span就变成__n-k页了，所以 <4>
+             * Let's understand this: 100 ------ 101 ------- 102 ------
+             * Suppose n_span starts at page 100 with size 3
+             * After splitting: k_span starts at 100, hence <1>
+             * After splitting: k_span has k pages, hence <2>
+             * After splitting: n_span now starts at 102, hence <3>
+             * After splitting: n_span becomes __n-k pages, hence <4>
              */
-            // 剩下的挂到相应位置
+            // Hang the remainder at the appropriate position
             __span_lists[n_span->__n].push_front(n_span);
             return k_span;
         }
     }
-    // 走到这里，说明找不到span了：找os要
+    // If we reach here, no span was found: request from OS
     span* big_span = new span;
-    big_span = 
+    big_span =
 }
 ```
 
-这里切分的逻辑，代码注释里面写的很清楚了！
+The splitting logic is explained clearly in the code comments!
 
-然后如果找到128页的都没找到，直接向系统申请！
+If nothing is found even up to 128 pages, we request directly from the system!
 
-这里要区分windows和linux。
+Here we need to distinguish between Windows and Linux.
 
 common.hpp
 ```cpp
@@ -792,79 +793,79 @@ inline static void* system_alloc(size_t kpage) {
 }
 ```
 
-然后new_span最后：
+Then the end of new_span:
 
 ```cpp
-    // 走到这里，说明找不到span了：找os要
+    // If we reach here, no span was found: request from OS
     span* big_span = new span;
     void* ptr = system_alloc(PAGES_NUM - 1);
     big_span->__page_id = (PAGE_ID)ptr >> PAGE_SHIFT;
     big_span->__n = PAGES_NUM - 1;
-    // 挂到上面去
+    // Hang it up
     __span_lists[PAGES_NUM - 1].push_front(big_span);
     return new_span(k);
 ```
 
-插入之后，不要重复写切分的逻辑了，递归调用一次自己就行了！
+After insertion, don't duplicate the splitting logic — just call itself recursively!
 
-### 关于 new_span 如何加锁的文字(重要/容易出bug)
+### About How new_span Handles Locking (Important / Easy to Bug)
 
-然后这里还有最关键的一步。这里整个方法是要加锁的！
+The most critical step here: the entire method needs to be locked!
 
-这里有个关键问题需要思考。
+There's a key issue to think about.
 
-get_non_empty_span是被fetch_range_obj调用的（在cc.cc）里面。
+`get_non_empty_span` is called by `fetch_range_obj` (in cc.cc).
 
-但是get_non_empty_span会去调用pc的new_span。
-现在有个关键问题了，此时，如果我们不做处理，在pc的new_span里面，其实是有cc的桶锁的。
-这个是很不好的。因为这个桶可能有内存需要释放啊！你锁住了，别人就进不去了。
-（其实这里我也是一知半解，要再去理解一下）
+But `get_non_empty_span` calls pc's `new_span`.
+Now here's the critical problem: if we don't handle this properly, inside pc's `new_span`, we're actually still holding cc's bucket lock.
+This is bad, because this bucket might have memory that needs to be released! If you hold the lock, others can't get in.
+(Honestly, I don't fully understand this part either — need to study it more.)
 
-所以，在`span* central_cache::get_non_empty_span(span_list& list, size_t size) {`里面这个`span* cur_span = page_cache::get_instance()->new_span(size_class::num_move_page(size));`这句话前面。我们先把桶锁解掉。
+So, in `span* central_cache::get_non_empty_span(span_list& list, size_t size) {`, before the line `span* cur_span = page_cache::get_instance()->new_span(size_class::num_move_page(size));`, we should release the bucket lock first.
 
-然后pc的new_span的全局锁，我们在cc.cc里面的`span* central_cache::get_non_empty_span(span_list& list, size_t size) {` 这里加。
+Then pc's `new_span`'s global lock — we add it in cc.cc's `span* central_cache::get_non_empty_span(span_list& list, size_t size) {`.
 
 cc.cc
 ```cpp
-    // 如果走到这里，说明没有空闲的span了，就要找pc了
+    // If we reach here, there are no free spans — need to ask pc
     page_cache::get_instance()->__page_mtx.lock();
     span* cur_span = page_cache::get_instance()->new_span(size_class::num_move_page(size));
     page_cache::get_instance()->__page_mtx.unlock();
 ```
 
-**现在问题来了，我们cc拿到这个新的span，后面还要切分的。刚刚在拿new_span之前解锁了，现在需要加上吗?**
+**Now the question is: we got this new span from cc, and we still need to cut it. We released the lock before getting new_span — do we need to re-lock now?**
 
-不需要！
+No!
 
-因为这个span是从pc拿来的，新的，也还没挂到cc上面去，所以别的线程拿不到这个span！所以不用加锁！
+Because this span was just obtained from pc — it's new and hasn't been hung on cc yet, so no other thread can access it! Therefore, no locking is needed!
 
-但是最后一步 `list.push_front(span)` 要访问cc对象了！就要加锁，我们把锁恢复一下。
+But the final step `list.push_front(span)` accesses the cc object — so we need the lock. Let's restore it.
 
 central_cache.cc
 ```cpp
 span* central_cache::get_non_empty_span(span_list& list, size_t size) {
-    // 先查看当前的spanlist中是否还有非空的span
+    // First check if there's a non-empty span in the current spanlist
     span* it = list.begin();
     while (it != list.end()) {
-        if (it->__free_list != nullptr) // 找到非空的了
+        if (it->__free_list != nullptr) // Found a non-empty one
             return it;
         it = it->__next;
     }
-    // 这里先解开桶锁
+    // Release the bucket lock here first
     list.__bucket_mtx.unlock();
 
-    // 如果走到这里，说明没有空闲的span了，就要找pc了
+    // If we reach here, there are no free spans — need to ask pc
     page_cache::get_instance()->__page_mtx.lock();
     span* cur_span = page_cache::get_instance()->new_span(size_class::num_move_page(size));
     page_cache::get_instance()->__page_mtx.unlock();
 
-    // 切分的逻辑
-    // 1. 计算span的大块内存的起始地址和大块内存的大小（字节数）
+    // Cutting logic
+    // 1. Compute the starting address and byte size of the span's large memory block
     char* addr_start = (char*)(cur_span->__page_id << PAGE_SHIFT);
-    size_t bytes = cur_span->__n << PAGE_SHIFT; // << PAGE_SHIFT 就是乘8kb的意思
+    size_t bytes = cur_span->__n << PAGE_SHIFT; // << PAGE_SHIFT means multiply by 8KB
     char* addr_end = addr_start + bytes;
-    // 2. 把大块内存切成自由链表链接起来
-    cur_span->__free_list = addr_start; // 先切一块下来做头
+    // 2. Cut the large memory block into a free list
+    cur_span->__free_list = addr_start; // Cut the first block as the head
     addr_start += size;
     void* tail = cur_span->__free_list;
     while(addr_start < addr_end) {
@@ -872,18 +873,18 @@ span* central_cache::get_non_empty_span(span_list& list, size_t size) {
         tail = free_list::__next_obj(tail);
         addr_start += size;
     }
-    // 恢复锁
+    // Restore the lock
     list.__bucket_mtx.lock();
     list.push_front(cur_span);
     return cur_span;
 }
 ```
 
-## 内存申请流程联调
+## Memory Allocation Flow Integration Testing
 
-先给每一步打上日志，看看调用的流程。
+First, add logs to each step to trace the call flow.
 
-然后多次调用tcmalloc，看看日志。
+Then call tcmalloc multiple times and check the logs.
 
 unit_test.cc
 ```cpp
@@ -905,7 +906,7 @@ void test_alloc() {
 }
 ```
 
-输出日志：
+Log output:
 ```bash
 call tcmalloc(1)
 [DEBUG][./include/tcmalloc.hpp][14] tcmalloc find tc from mem
@@ -960,25 +961,25 @@ call tcmalloc(7)
 ```
 
 
-同样，再测一次。
+Let's also test again:
 
 ```cpp
 void test_alloc2() {
     for (size_t i = 0; i < 1024; ++i) {
         void* p1 = tcmalloc(6);
     }
-    void* p2 = tcmalloc(6); // 这一次一定会找新的span
+    void* p2 = tcmalloc(6); // This time it will definitely need a new span
 }
 ```
 
-如果申请1024次6字节（对齐后为8字节），第1025次申请，一定会向系统申请新的span了，之前都不需要的！所以预期输出只有两个`goto os for mem`。
+If we allocate 6 bytes 1024 times (aligned to 8 bytes), the 1025th allocation will definitely require a new span from the system — all previous ones won't! So the expected output should have only two `goto os for mem` messages.
 
-输出日志放在了 `./test/test1.log` 。
+The output log is saved in `./test/test1.log`.
 
 
-## thread_cache内存释放
+## Thread Cache Memory Deallocation
 
-当链表长度大于一次批量申请的内存的时候，就开始还一段list给cc
+When the list length exceeds the batch allocation size, start returning a segment of the list to cc.
 
 thread_cache.cc
 ```cpp
@@ -987,7 +988,7 @@ void thread_cache::deallocate(void* ptr, size_t size) {
     assert(size <= MAX_BYTES);
     size_t index = size_class::bucket_index(size);
     __free_lists[index].push(ptr);
-    // 当链表长度大于一次批量申请的内存的时候，就开始还一段list给cc
+    // When the list length exceeds the batch allocation size, return a segment to cc
     if (__free_lists[index].size() >= __free_lists[index].max_size()) {
         list_too_long(__free_lists[index], size);
     }
@@ -1004,42 +1005,42 @@ void thread_cache::list_too_long(free_list& list, size_t size) {
 }
 ```
 
-tcmalloc的规则更复杂，可能还会控制内存大小，超过...就会释放等。
+tcmalloc's rules are more complex — it might also control memory size, releasing when exceeding a threshold, etc.
 
 
-## central_cache内存释放
+## Central Cache Memory Deallocation
 
 ```cpp
 void central_cache::release_list_to_spans(void* start, size_t size) {
-    size_t index = size_class::bucket_index(size); // 先算一下在哪一个桶里面
+    size_t index = size_class::bucket_index(size); // Find which bucket
     __span_lists[index].__bucket_mtx.lock();
-    // 这里要注意，一个桶挂了多个span，这些内存块挂到哪一个span是不确定的
+    // Note: one bucket may hold multiple spans; which span these blocks belong to is uncertain
 
     __span_lists[index].__bucket_mtx.unlock();
 }
 ```
 
-**这里的问题是：如何确定每一块内存块应该到哪一个span里面去。**
+**The question here is: how do we determine which span each memory block should go back to?**
 
 
-现在要判断，这些内存块，是来自哪个span的，然后span是从page切出来的，page是有地址的，span也是有地址的。
+We need to determine which span these memory blocks came from. Spans are cut from pages, pages have addresses, and spans have addresses too.
 
-所以最好在page里面的时候，先让pageid和span的地址映射起来先。
+So ideally, when memory is still in page cache, we should map page IDs to span addresses beforehand.
 
-在pc.hpp里面增加。
+Add this to pc.hpp:
 ```cpp
 std::unordered_map<PAGE_ID, span*> __id_span_map;
 ```
 
-**然后在new_span里面，把新的span分给cc的时候，记录一下映射。**
+**Then in new_span, when distributing the new span to cc, record the mapping.**
 
-然后pc里面提供一个方法，获取对象到span映射。
+Provide a method in pc to get the object-to-span mapping:
 
 page_cache.cc
 ```cpp
 span* page_cache::map_obj_to_span(void* obj) {
-    // 先把页号算出来
-    PAGE_ID id = (PAGE_ID)obj >> PAGE_SHIFT; // 这个理论推导可以自行推导一下
+    // First compute the page number
+    PAGE_ID id = (PAGE_ID)obj >> PAGE_SHIFT; // You can derive this formula yourself
     auto ret = __id_span_map.find(id);
     if (ret != __id_span_map.end())
         return ret->second;
@@ -1049,40 +1050,42 @@ span* page_cache::map_obj_to_span(void* obj) {
 }
 ```
 
-此时就可以通过一个对象，获取到对应是哪一个span了。
+Now we can get the corresponding span from an object.
 
-此时就可以继续写`release_list_to_spans`了。
+Now we can continue writing `release_list_to_spans`:
 
 ```cpp
 void central_cache::release_list_to_spans(void* start, size_t size) {
-    size_t index = size_class::bucket_index(size); // 先算一下在哪一个桶里面
+    size_t index = size_class::bucket_index(size); // Find which bucket
     __span_lists[index].__bucket_mtx.lock();
-    // 这里要注意，一个桶挂了多个span，这些内存块挂到哪一个span是不确定的
+    // Note: one bucket may hold multiple spans; which span these blocks belong to is uncertain
     while (start) {
-        // 遍历这个链表
-        void* next = free_list::__next_obj(start); // 先记录一下下一个，避免等下找不到了
+        // Traverse this list
+        void* next = free_list::__next_obj(start); // Save next first to avoid losing it
         span* cur_span = page_cache::get_instance()->map_obj_to_span(start);
         free_list::__next_obj(start) = cur_span->__free_list;
         cur_span->__free_list = start;
-        // 处理usecount
+        // Handle use_count
         cur_span->__use_count--;
         if (cur_span->__use_count == 0) {
-            // 说明这个span切分出去的所有小块都回来了
-            // 归还给pagecache
-            // 1. 把这一页从cc的这个桶的spanlist中拿掉
-            __span_lists[index].erase(cur_span); // 从桶里面拿走
-            // 2. 此时不用管这个span的freelist了，因为这些内存本来就是span初始地址后面的，然后顺序也是乱的，直接置空即可
-            //      (这里还不太理解)
+            // All small blocks cut from this span have returned
+            // Return to page cache
+            // 1. Remove this span from cc's bucket spanlist
+            __span_lists[index].erase(cur_span); // Remove from bucket
+            // 2. No need to care about this span's freelist now, because this memory
+            //    is originally after the span's start address, and the order is scrambled,
+            //    so just set it to null
+            //    (I don't fully understand this part yet)
             cur_span->__free_list = nullptr;
             cur_span->__next = cur_span->__prev = nullptr;
-            // 页号，页数是不能动的！
-            // 3. 解开桶锁
+            // Page number and page count must not be modified!
+            // 3. Release the bucket lock
             __span_lists[index].__bucket_mtx.unlock();
-            // 4. 还给pc
+            // 4. Return to pc
             page_cache::get_instance()->__page_mtx.lock();
             page_cache::get_instance()->release_span_to_page(cur_span);
             page_cache::get_instance()->__page_mtx.unlock();
-            // 5. 恢复桶锁
+            // 5. Restore the bucket lock
             __span_lists[index].__bucket_mtx.lock();
         }
         start = next;
@@ -1091,96 +1094,97 @@ void central_cache::release_list_to_spans(void* start, size_t size) {
 }
 ```
 
-细节在注释里面写的很清楚了。
+The details are explained clearly in the comments.
 
-要注意，调用pc的接口的时候，就记得把桶锁解掉。
+Remember: when calling pc's interface, release the bucket lock first.
 
-## page_cache内存释放
+## Page Cache Memory Deallocation
 
-就是这个函数。
+This is the function:
 
 ```cpp
 void page_cache::release_span_to_page(span* s) {
-    // 对span前后对页尝试进行合并，缓解内存碎片问题
+    // Try to merge adjacent pages before and after the span to alleviate memory fragmentation
 }
 ```
 
-然后刚才的map可以帮助我们查找前后的page。
+The map we wrote earlier can help us find adjacent pages.
 
-然后我们前后找的时候，要区分这个页是不是在centralCache上的，如果在cc上，那就不能合并。
+When searching before and after, we need to distinguish whether the page is on centralCache. If it's on cc, it cannot be merged.
 
-然后这个判断不能用use_count==0这个判断条件。有可能这个span刚从pc拿过来，还没给别人的时候，use_count就是0，这个span，pc是不能回收合并的。
+We can't use `use_count == 0` as the condition for this check. A span might have just been taken from pc and not yet given to anyone — its use_count would be 0, but pc shouldn't reclaim and merge it.
 
-所以可以给span添加一个参数is_use就行了。
+So we can add an `is_use` field to span:
 
 ```cpp
-// 管理大块内存
+// Manages large memory blocks
 class span {
 public:
-    PAGE_ID __page_id; // 大块内存起始页的页号
-    size_t __n = 0; // 页的数量
-    // 双向链表结构
+    PAGE_ID __page_id; // Page number of the starting page of the large memory block
+    size_t __n = 0; // Number of pages
+    // Doubly-linked list structure
     span* __next = nullptr;
     span* __prev = nullptr;
-    size_t __use_count = 0; // 切成段小块内存，被分配给threadCache的计数器
-    void* __free_list = nullptr; // 切好的小块内存的自由链表
-    bool is_use = false; // 是否在被使用
+    size_t __use_count = 0; // Counter for small blocks distributed to threadCache
+    void* __free_list = nullptr; // Free list of cut small memory blocks
+    bool is_use = false; // Whether the span is in use
 };
 ```
 
-然后cc.cc这里改一下，拿到之后改成true就行。
+Then modify cc.cc — set it to true after obtaining the span:
 
 cc.cc
 ```cpp
     page_cache::get_instance()->__page_mtx.lock();
     span* cur_span = page_cache::get_instance()->new_span(size_class::num_move_page(size));
-    cur_span->is_use = true; // 表示已经被使用
+    cur_span->is_use = true; // Mark as in use
     page_cache::get_instance()->__page_mtx.unlock();
 ```
 
 
-然后继续写这个逻辑:
+Then continue writing the logic:
 
 page_cache.cc
 ```cpp
 void page_cache::release_span_to_page(span* s) {
-    // 对span前后对页尝试进行合并，缓解内存碎片问题
-    PAGE_ID prev_id = s->__page_id - 1; // 前一块span的id一定是当前span的id-1
-    // 拿到id如何找span: 之前写好的map能拿到吗？
+    // Try to merge adjacent pages before and after the span to alleviate memory fragmentation
+    PAGE_ID prev_id = s->__page_id - 1; // The previous span's ID is always current span's ID - 1
+    // Given the ID, can we find the span using the map we wrote earlier?
 }
 ```
 
-现在的问题是，之前的map能拿到吗？还拿不到，因为我们之前的map只记录了分给cc的span的映射，没有存留在pc那些，没有分出去的映射。
-所以我们要在`span* page_cache::new_span(size_t k) {`里面添加一下，留在pagecache那些块的映射。
+The current problem is: can the previous map find it? Not yet, because our map only recorded the mappings of spans distributed to cc, not the spans remaining in pc.
+So we need to add mappings in `span* page_cache::new_span(size_t k) {` for the blocks that stay in pageCache.
 
 ```cpp
-            // 存储n_span的首尾页号跟n_span的映射，方便pc回收内存时进行合并查找
+            // Store the mapping of n_span's first and last page numbers to n_span,
+            // to facilitate merge lookups during pc memory reclamation
             __id_span_map[n_span->__page_id] = n_span;
             __id_span_map[n_span->__page_id + n_span->__n - 1] = n_span;
 ```
 
-为什么这里不用循环存储呢？
+Why don't we need to store the mapping in a loop here?
 
-因为这里的pc的内存只是被span挂起来啊，不会被切啊，所以知道地址就了啊！
-给cc的那些，会被切开变成很多固定大小的内存块啊！所以这里不用循环存。
+Because pc's memory is just hung on spans — it won't be cut up. So knowing the address is enough!
+The memory given to cc gets cut into many fixed-size memory blocks! That's why we don't need to store mappings in a loop here.
 
-## 大于256k的情况
+## Handling Allocations Larger Than 256KB
 
-1. <=256kb -> 按照前面三层缓存的情况进行操作
-2. \>256kb的情况
-   a. 128\*8k > size > 32\*8k这个情况: 还可以找pagecache
-   b. 否则直接找系统
+1. <= 256KB -> Follow the three-tier cache approach described above
+2. \> 256KB:
+   a. 128\*8KB > size > 32\*8KB: Can still go to pageCache
+   b. Otherwise: Go directly to the system
 
-然后这一部分就是有多处要改，不过都很简单很容易找到，大家可以直接看代码。处理完之后，测试一下申请大内存就行。
+This part requires modifications in multiple places, but they're all simple and easy to find — you can look at the code directly. After handling this, test with large memory allocations.
 
 
-## 处理代码中`new`的问题
+## Handling the `new` Problem in the Code
 
-代码中有些地方用了`new span`。这个就很不对。我们弄这个tcmalloc是用来替代malloc的，既然是替代，那我们的代码里面怎么能有`new`，`new`也是调用`malloc`的，所以我们要改一下。
+Some places in the code use `new span`. This is incorrect. We're building tcmalloc to replace malloc, and since it's a replacement, our code shouldn't contain `new` — `new` also calls `malloc` internally. So we need to change this.
 
-然后之前是写了一个定长内存池的，可以用来代替new。
+We previously wrote a fixed-size memory pool that can replace `new`.
 
-**博客地址：[内存池是什么原理？｜内存池简易模拟实现｜为学习高并发内存池tcmalloc做准备](https://blog.csdn.net/Yu_Cblog/article/details/131741601)**
+**Blog post: [What's the Principle Behind Memory Pools? | Simple Memory Pool Implementation | Preparation for Learning High-Concurrency Memory Pool tcmalloc](https://blog.csdn.net/Yu_Cblog/article/details/131741601)**
 
 page_cache.hpp
 ```cpp
@@ -1193,27 +1197,27 @@ private:
     std::unordered_map<PAGE_ID, span*> __id_span_map;
     object_pool<span> __span_pool;
 ```
-多加一个`object_pool<span> __span_pool;`对象。
+Add an `object_pool<span> __span_pool;` object.
 
-然后，`new span`的地方都替换掉。`delete`的地方也换掉就行。
+Then replace all `new span` occurrences. Replace `delete` calls too.
 
-然后这里面也改一下。
+Also modify here:
 
 tcmalloc.hpp
 ```cpp
 static void* tcmalloc(size_t size) {
     if (size > MAX_BYTES) {
-        // 处理申请大内存的情况
+        // Handle large memory allocation
         size_t align_size = size_class::round_up(size);
         size_t k_page = align_size >> PAGE_SHIFT;
         page_cache::get_instance()->__page_mtx.lock();
-        span* cur_span = page_cache::get_instance()->new_span(k_page); // 直接找pc
+        span* cur_span = page_cache::get_instance()->new_span(k_page); // Go directly to pc
         page_cache::get_instance()->__page_mtx.unlock();
-        void* ptr = (void*)(cur_span->__page_id << PAGE_SHIFT); // span转化成地址
+        void* ptr = (void*)(cur_span->__page_id << PAGE_SHIFT); // Convert span to address
         return ptr;
     }
     if (p_tls_thread_cache == nullptr) {
-        // 相当于单例
+        // Essentially a singleton per thread
         // p_tls_thread_cache = new thread_cache;
         static object_pool<thread_cache> tc_pool;
         p_tls_thread_cache = tc_pool.new_();
@@ -1225,17 +1229,17 @@ static void* tcmalloc(size_t size) {
 }
 ```
 
-## 解决free，使其不用传大小
+## Making free Work Without Passing Size
 
-因为我们已经有页号到span的映射了。所以我们在span里面增加一个字段，obj_size就行。
+Since we already have a page-number-to-span mapping, we just add an `obj_size` field to span.
 
-## 多线程场景下深度测试
+## Deep Testing in Multi-threaded Scenarios
 
-**首先要明确一点，我们不是去造一个轮子，我们要和malloc对比，不是说要比malloc快多少，因为我们在很多细节上，和tcmalloc差的还是很远的。**
+**First, let's be clear: we're not trying to build a production wheel. We're comparing against malloc, not trying to be much faster — in many details, we're still far from the real tcmalloc.**
 
-测试代码可以见bench\_mark.cc。
+The test code can be found in bench\_mark.cc.
 
-结果
+Results:
 ```bash
 parallels@ubuntu-linux-22-04-desktop:~/Project/Google-tcmalloc-simulation-implementation$ ./out
 ==========================================================
@@ -1251,17 +1255,16 @@ parallels@ubuntu-linux-22-04-desktop:~/Project/Google-tcmalloc-simulation-implem
 parallels@ubuntu-linux-22-04-desktop:~/Project/Google-tcmalloc-simulation-implementation$
 ```
 
-比malloc差。
+Worse than malloc.
 
-## 分析性能瓶颈
+## Analyzing Performance Bottlenecks
 
-linux和windows(VS STUDIO)下都有很多性能分析的工具，可以检测哪里调用的时间多。
+Both Linux and Windows (VS Studio) have many performance analysis tools to detect where time is spent.
 
-在这里直接出结论：锁用了很多时间。
+Here we jump straight to the conclusion: locking is consuming a lot of time.
 
-可以用基数树进行优化。
+The radix tree can be used for optimization.
 
-## 用Radix Tree进行优化
+## Optimization with Radix Tree
 
-radix tree 我们可以直接用tcmalloc源码里面的。`page_map.hpp`。
-
+We can directly use the radix tree from tcmalloc's source code: `page_map.hpp`.

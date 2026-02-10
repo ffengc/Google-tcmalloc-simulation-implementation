@@ -39,4 +39,4 @@ The structure diagram is shown below.
 
 ## 📚Detailed project implementation records
 
-- **[work.md](./work.md) (Chinese Only)**
+- **[work.md](./work.md)** | **[work-cn.md (中文)](./work-cn.md)**
